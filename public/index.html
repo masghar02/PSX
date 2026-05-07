@@ -181,6 +181,33 @@
   let toastTimer = null;
   let alertSymbols = [];
 
+  function getApiBase() {
+    // If the HTML is opened directly from disk, use local dev server explicitly.
+    if (window.location.protocol === 'file:') return 'http://localhost:3000';
+    return '';
+  }
+
+  async function fetchStocksPayload() {
+    const response = await fetch(`${getApiBase()}/api/stocks`);
+    let payload = null;
+    try {
+      payload = await response.json();
+    } catch (parseError) {
+      throw new Error(`Invalid API response (HTTP ${response.status})`);
+    }
+
+    if (!response.ok) {
+      const backendError = payload && payload.error ? payload.error : `HTTP ${response.status}`;
+      throw new Error(backendError);
+    }
+
+    if (!payload || !Array.isArray(payload.data) || !payload.summary) {
+      throw new Error('API payload missing expected fields');
+    }
+
+    return payload;
+  }
+
   function persistWatchlist() {
     localStorage.setItem('psx_watchlist', JSON.stringify([...watchlist]));
   }
@@ -621,8 +648,7 @@
   // Fetch data
   async function loadStocks() {
     try {
-      const res = await fetch('/api/stocks');
-      const json = await res.json();
+      const json = await fetchStocksPayload();
       allStocks = json.data;
       refreshTimer = 300;
 
@@ -643,7 +669,8 @@
       evaluateAlerts(allStocks);
       applyFilters();
     } catch (err) {
-      document.getElementById('updated').textContent = '❌ Failed to fetch';
+      const message = err && err.message ? err.message : 'Unknown network error';
+      document.getElementById('updated').textContent = `❌ Failed to fetch: ${message}`;
     }
   }
 

@@ -33,6 +33,28 @@
   </div>
 
   <script>
+    function getApiBase() {
+      if (window.location.protocol === 'file:') return 'http://localhost:3000';
+      return '';
+    }
+
+    async function fetchStocksPayload() {
+      const response = await fetch(`${getApiBase()}/api/stocks`);
+      let payload = null;
+      try {
+        payload = await response.json();
+      } catch (parseError) {
+        throw new Error(`Invalid API response (HTTP ${response.status})`);
+      }
+
+      if (!response.ok) {
+        const backendError = payload && payload.error ? payload.error : `HTTP ${response.status}`;
+        throw new Error(backendError);
+      }
+
+      return payload;
+    }
+
     function renderSectorPerformance(stocks) {
       const container = document.getElementById('sector-performance');
       if (!stocks.length) {
@@ -76,12 +98,12 @@
 
     async function loadSectorPerformance() {
       try {
-        const res = await fetch('/api/stocks');
-        const json = await res.json();
+        const json = await fetchStocksPayload();
         renderSectorPerformance(json.data || []);
         document.getElementById('updated').textContent = `Updated: ${json.updated || '--'}`;
       } catch (error) {
-        document.getElementById('updated').textContent = 'Failed to fetch sector data';
+        const message = error && error.message ? error.message : 'Unknown network error';
+        document.getElementById('updated').textContent = `Failed to fetch sector data: ${message}`;
       }
     }
 
