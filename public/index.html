@@ -124,6 +124,15 @@
   <!-- Stock Cards -->
   <p id="stock-count" class="text-gray-500 text-sm mb-3"></p>
   <div id="stocks" class="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"></div>
+  <div id="pagination" class="mt-4 flex items-center justify-between rounded-lg border border-gray-800 bg-gray-900 px-3 py-2 text-sm text-gray-300">
+    <button id="page-prev" type="button" class="rounded border border-gray-600 px-3 py-1 hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50">
+      Prev
+    </button>
+    <span id="page-info" class="text-xs text-gray-400">Page 1 of 1</span>
+    <button id="page-next" type="button" class="rounded border border-gray-600 px-3 py-1 hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50">
+      Next
+    </button>
+  </div>
 
   <!-- Stock Detail Modal -->
   <div id="stock-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 px-4">
@@ -180,6 +189,9 @@
   let alerts = JSON.parse(localStorage.getItem('psx_alerts') || '[]');
   let toastTimer = null;
   let alertSymbols = [];
+  let currentPage = 1;
+  const PAGE_SIZE = 50;
+  let currentFilteredStocks = [];
 
   function getApiBase() {
     // If the HTML is opened directly from disk, use local dev server explicitly.
@@ -450,13 +462,48 @@
       const vb = parseFloat(b[field]) || 0;
       return dir === 'desc' ? vb - va : va - vb;
     });
-
-    document.getElementById('stock-count').textContent =
-      `Showing ${filtered.length} of ${allStocks.length} stocks`;
-    renderStocks(filtered);
+    currentFilteredStocks = filtered;
+    currentPage = 1;
+    renderCurrentPage();
   }
 
-  // Render stock cards
+  function renderCurrentPage() {
+    const total = currentFilteredStocks.length;
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    if (currentPage > totalPages) currentPage = totalPages;
+
+    const start = (currentPage - 1) * PAGE_SIZE;
+    const end = start + PAGE_SIZE;
+    const pagedStocks = currentFilteredStocks.slice(start, end);
+
+    const shownStart = total === 0 ? 0 : start + 1;
+    const shownEnd = Math.min(end, total);
+    document.getElementById('stock-count').textContent =
+      `Showing ${shownStart}-${shownEnd} of ${total} filtered (${allStocks.length} total)`;
+
+    renderStocks(pagedStocks);
+    renderPagination(totalPages, total);
+  }
+
+  function renderPagination(totalPages, totalItems) {
+    const prevBtn = document.getElementById('page-prev');
+    const nextBtn = document.getElementById('page-next');
+    const info = document.getElementById('page-info');
+    const wrapper = document.getElementById('pagination');
+
+    info.textContent = `Page ${currentPage} of ${totalPages}`;
+    prevBtn.disabled = currentPage <= 1;
+    nextBtn.disabled = currentPage >= totalPages;
+    wrapper.classList.toggle('hidden', totalItems <= PAGE_SIZE);
+  }
+
+  function goToPage(page) {
+    const totalPages = Math.max(1, Math.ceil(currentFilteredStocks.length / PAGE_SIZE));
+    currentPage = Math.min(totalPages, Math.max(1, page));
+    renderCurrentPage();
+  }
+
+  // Render stock cards for current page
   function renderStocks(stocks) {
     const container = document.getElementById('stocks');
     container.innerHTML = stocks.map((s, index) => {
@@ -694,6 +741,8 @@
   document.getElementById('alert-symbol').addEventListener('keydown', (event) => {
     if (event.key === 'Enter') addAlert();
   });
+  document.getElementById('page-prev').addEventListener('click', () => goToPage(currentPage - 1));
+  document.getElementById('page-next').addEventListener('click', () => goToPage(currentPage + 1));
 
   renderWatchlistChips();
   renderAlerts();
