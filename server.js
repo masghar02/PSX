@@ -1,7 +1,5 @@
 const express = require('express');
 const path = require('path');
-const axios = require('axios');
-const cheerio = require('cheerio');
 
 const app = express();
 
