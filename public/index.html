@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>PSX Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-950 text-white min-h-screen p-4">
+<div class="max-w-7xl mx-auto">
+  <!-- Header -->
+  <div class="flex justify-between items-center mb-4">
+    <h1 class="text-2xl font-bold text-green-400">📈 PSX Dashboard</h1>
+    <div class="flex items-center gap-3">
+      <a
+        href="/sector-performance.html"
+        class="rounded-lg border border-cyan-700 bg-cyan-900/40 px-3 py-1 text-xs text-cyan-200 hover:bg-cyan-800/50"
+      >
+        Sector Performance
+      </a>
+      <span id="clock" class="text-gray-400 text-sm"></span>
+    </div>
+  </div>
+
+  <!-- Market Summary Banner -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+    <div class="bg-blue-900 rounded-xl p-3 text-center">
+      <p class="text-gray-300 text-xs">Market Status</p>
+      <p id="mkt-status" class="text-lg font-bold text-green-400">--</p>
+    </div>
+    <div class="bg-gray-900 rounded-xl p-3 text-center">
+      <p class="text-gray-300 text-xs">Total Volume</p>
+      <p id="mkt-volume" class="text-lg font-bold">--</p>
+    </div>
+    <div class="bg-gray-900 rounded-xl p-3 text-center">
+      <p class="text-gray-300 text-xs">Advanced / Declined</p>
+      <p id="mkt-adv" class="text-lg font-bold">--</p>
+    </div>
+    <div class="bg-gray-900 rounded-xl p-3 text-center">
+      <p class="text-gray-300 text-xs">Total Trades</p>
+      <p id="mkt-trades" class="text-lg font-bold">--</p>
+    </div>
+  </div>
+
+  <!-- Last Updated & Refresh -->
+  <div class="flex justify-between items-center mb-4">
+    <p id="updated" class="text-gray-400 text-sm">Fetching data...</p>
+    <p id="countdown" class="text-gray-500 text-xs"></p>
+  </div>
+
+  <!-- Search + Filter -->
+  <div class="flex flex-col sm:flex-row gap-2 mb-4">
+    <input id="search" type="text" placeholder="🔍 Search stock or sector..."
+      class="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-green-500"
+      oninput="applyFilters()" />
+    <select id="sectorFilter" onchange="applyFilters()"
+      class="bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-green-500">
+      <option value="">All Sectors</option>
+    </select>
+    <select id="sortBy" onchange="applyFilters()"
+      class="bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-green-500">
+      <option value="changePercent_desc">Sort: Top Gainers</option>
+      <option value="changePercent_asc">Sort: Top Losers</option>
+      <option value="price_desc">Sort: Price High</option>
+      <option value="price_asc">Sort: Price Low</option>
+      <option value="volume_desc">Sort: Volume High</option>
+    </select>
+    <label class="flex items-center gap-2 rounded-lg border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-gray-200">
+      <input id="watchlistOnly" type="checkbox" onchange="applyFilters()" />
+      Watchlist only
+    </label>
+  </div>
+
+  <!-- Watchlist -->
+  <div class="mb-4 rounded-xl border border-yellow-700/40 bg-gray-900 p-3">
+    <div class="mb-2 flex items-center justify-between">
+      <h2 class="font-bold text-yellow-300">⭐ Watchlist</h2>
+      <span id="watchlist-count" class="text-xs text-gray-400">0 stocks</span>
+    </div>
+    <div id="watchlist-chips" class="flex flex-wrap gap-2"></div>
+  </div>
+
+  <!-- Price Alerts -->
+  <div class="mb-6 rounded-xl border border-purple-700/40 bg-gray-900 p-4">
+    <h2 class="mb-3 font-bold text-purple-300">🔔 Price Alerts</h2>
+    <div class="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-5">
+      <div class="relative sm:col-span-1">
+        <input id="alert-symbol" type="text" autocomplete="off" placeholder="Symbol (e.g. OGDC)"
+          class="w-full rounded-lg border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500" />
+        <div id="alert-symbol-suggestions" class="absolute z-20 mt-1 hidden max-h-48 w-full overflow-y-auto rounded-lg border border-gray-700 bg-gray-900 p-1 shadow-xl"></div>
+      </div>
+      <select id="alert-condition"
+        class="rounded-lg border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500">
+        <option value="gte">Above or equal (>=)</option>
+        <option value="lte">Below or equal (<=)</option>
+      </select>
+      <input id="alert-target" type="number" step="0.01" placeholder="Target price"
+        class="rounded-lg border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500" />
+      <button id="add-alert-btn" type="button"
+        class="rounded-lg bg-purple-600 px-3 py-2 text-sm font-semibold text-white hover:bg-purple-500">
+        Add Alert
+      </button>
+      <button id="clear-alerts-btn" type="button"
+        class="rounded-lg border border-gray-600 px-3 py-2 text-sm text-gray-300 hover:bg-gray-800">
+        Clear Triggered
+      </button>
+    </div>
+    <div id="alerts-list" class="space-y-2"></div>
+  </div>
+
+  <!-- Top Gainers & Losers -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+    <div class="bg-gray-900 rounded-xl p-4">
+      <h2 class="text-green-400 font-bold mb-3">🏆 Top 5 Gainers</h2>
+      <div id="gainers"></div>
+    </div>
+    <div class="bg-gray-900 rounded-xl p-4">
+      <h2 class="text-red-400 font-bold mb-3">📉 Top 5 Losers</h2>
+      <div id="losers"></div>
+    </div>
+  </div>
+
+  <!-- Stock Cards -->
+  <p id="stock-count" class="text-gray-500 text-sm mb-3"></p>
+  <div id="stocks" class="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"></div>
+
+  <!-- Stock Detail Modal -->
+  <div id="stock-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 px-4">
+    <div class="w-full max-w-3xl rounded-2xl border border-gray-700 bg-gray-900 p-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div class="mb-3 flex items-start justify-between">
+        <div>
+          <p id="modal-symbol" class="text-xs text-gray-400"></p>
+          <h3 id="modal-name" class="text-xl sm:text-2xl font-bold text-green-400">--</h3>
+        </div>
+        <button
+          id="modal-close"
+          class="rounded-lg border border-gray-600 px-3 py-1 text-sm text-gray-300 hover:bg-gray-800"
+          type="button"
+        >
+          Close
+        </button>
+      </div>
+
+      <div class="mb-3 flex flex-wrap items-end justify-between gap-3 rounded-xl border border-gray-700 bg-gray-950 p-3">
+        <div>
+          <p id="modal-price" class="text-2xl sm:text-3xl font-bold">PKR --</p>
+          <p id="modal-change" class="mt-1 text-base sm:text-lg font-semibold text-gray-300">--%</p>
+        </div>
+        <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-gray-300">
+          <p>Open: <span id="modal-open" class="font-semibold text-white">--</span></p>
+          <p>High: <span id="modal-high" class="font-semibold text-white">--</span></p>
+          <p>Low: <span id="modal-low" class="font-semibold text-white">--</span></p>
+          <p>Close: <span id="modal-close-value" class="font-semibold text-white">--</span></p>
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-gray-700 bg-gray-950 p-3">
+        <p class="mb-2 text-sm text-gray-400">Price + Volume Overview</p>
+        <div class="h-72 sm:h-80">
+          <canvas id="volume-chart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="pointer-events-none fixed bottom-6 right-6 z-[60] hidden rounded-lg border border-green-600 bg-green-900/90 px-4 py-3 text-sm font-semibold text-green-100 shadow-xl"></div>
+
+  <!-- Footer -->
+  <p class="text-center text-gray-600 text-xs mt-8 pb-4">
+    Data scraped from PSX.com.pk • Auto-refreshes every 5 minutes
+  </p>
+</div>
+
+<script>
+  let allStocks = [];
+  let refreshTimer = 300;
+  let volumeChart = null;
+  let watchlist = new Set(JSON.parse(localStorage.getItem('psx_watchlist') || '[]'));
+  let alerts = JSON.parse(localStorage.getItem('psx_alerts') || '[]');
+  let toastTimer = null;
+  let alertSymbols = [];
+
+  function persistWatchlist() {
+    localStorage.setItem('psx_watchlist', JSON.stringify([...watchlist]));
+  }
+
+  function persistAlerts() {
+    localStorage.setItem('psx_alerts', JSON.stringify(alerts));
+  }
+
+  function showToast(message) {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.classList.remove('hidden');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.add('hidden'), 3500);
+  }
+
+  function toggleWatchlist(symbol) {
+    if (watchlist.has(symbol)) {
+      watchlist.delete(symbol);
+    } else {
+      watchlist.add(symbol);
+    }
+    persistWatchlist();
+    renderWatchlistChips();
+    applyFilters();
+  }
+
+  function renderWatchlistChips() {
+    const container = document.getElementById('watchlist-chips');
+    const items = [...watchlist].sort();
+    document.getElementById('watchlist-count').textContent = `${items.length} stock${items.length === 1 ? '' : 's'}`;
+    if (!items.length) {
+      container.innerHTML = '<p class="text-sm text-gray-500">No favorites yet. Tap ★ on any stock card.</p>';
+      return;
+    }
+    container.innerHTML = items.map((symbol) => `
+      <button
+        type="button"
+        class="watchlist-chip rounded-full border border-yellow-500/60 bg-yellow-500/10 px-3 py-1 text-xs text-yellow-200 hover:bg-yellow-500/20"
+        data-symbol="${symbol}"
+      >
+        ${symbol}
+      </button>
+    `).join('');
+
+    container.querySelectorAll('.watchlist-chip').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const search = document.getElementById('search');
+        search.value = chip.dataset.symbol || '';
+        applyFilters();
+      });
+    });
+  }
+
+  function addAlert() {
+    const symbolInput = document.getElementById('alert-symbol');
+    const conditionInput = document.getElementById('alert-condition');
+    const targetInput = document.getElementById('alert-target');
+
+    const symbol = symbolInput.value.trim().toUpperCase();
+    const condition = conditionInput.value;
+    const target = Number(targetInput.value);
+    if (!symbol || !Number.isFinite(target) || target <= 0) {
+      showToast('Enter valid symbol and target price.');
+      return;
+    }
+
+    alerts.push({
+      id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      symbol,
+      condition,
+      target: Number(target.toFixed(2)),
+      status: 'active',
+      createdAt: Date.now(),
+      triggeredAt: null,
+      lastPrice: null,
+    });
+    persistAlerts();
+    renderAlerts();
+    symbolInput.value = '';
+    targetInput.value = '';
+    showToast(`Alert added for ${symbol}.`);
+  }
+
+  function deleteAlert(id) {
+    alerts = alerts.filter((a) => a.id !== id);
+    persistAlerts();
+    renderAlerts();
+  }
+
+  function clearTriggeredAlerts() {
+    alerts = alerts.filter((a) => a.status !== 'triggered');
+    persistAlerts();
+    renderAlerts();
+  }
+
+  function renderAlerts() {
+    const container = document.getElementById('alerts-list');
+    if (!alerts.length) {
+      container.innerHTML = '<p class="text-sm text-gray-500">No alerts yet.</p>';
+      return;
+    }
+
+    const sorted = [...alerts].sort((a, b) => b.createdAt - a.createdAt);
+    container.innerHTML = sorted.map((a) => {
+      const statusClass = a.status === 'triggered' ? 'text-green-400' : 'text-yellow-300';
+      const statusText = a.status === 'triggered' ? `Triggered @ PKR ${formatNumber(a.lastPrice)}`
+        : 'Waiting';
+      const conditionText = a.condition === 'gte' ? '>=' : '<=';
+      return `
+        <div class="flex items-center justify-between rounded-lg border border-gray-700 bg-gray-950 px-3 py-2">
+          <div class="text-sm">
+            <span class="font-semibold text-white">${a.symbol}</span>
+            <span class="text-gray-400">${conditionText} ${formatNumber(a.target)}</span>
+            <span class="ml-2 text-xs ${statusClass}">${statusText}</span>
+          </div>
+          <button type="button" class="delete-alert rounded border border-gray-600 px-2 py-1 text-xs text-gray-300 hover:bg-gray-800" data-id="${a.id}">
+            Delete
+          </button>
+        </div>
+      `;
+    }).join('');
+
+    container.querySelectorAll('.delete-alert').forEach((btn) => {
+      btn.addEventListener('click', () => deleteAlert(btn.dataset.id));
+    });
+  }
+
+  function evaluateAlerts(stocks) {
+    const index = new Map(stocks.map((s) => [String(s.symbol).toUpperCase(), s]));
+    let changed = false;
+    alerts.forEach((alert) => {
+      if (alert.status !== 'active') return;
+      const stock = index.get(alert.symbol);
+      if (!stock) return;
+      const price = Number(stock.price);
+      if (!Number.isFinite(price)) return;
+      const hit = alert.condition === 'gte' ? price >= alert.target : price <= alert.target;
+      if (hit) {
+        alert.status = 'triggered';
+        alert.lastPrice = price;
+        alert.triggeredAt = Date.now();
+        changed = true;
+        showToast(`🔔 ${alert.symbol} hit target at PKR ${formatNumber(price)}`);
+      }
+    });
+    if (changed) {
+      persistAlerts();
+      renderAlerts();
+    }
+  }
+
+  function updateAlertSuggestions(stocks) {
+    alertSymbols = [...new Set(stocks.map((s) => String(s.symbol || '').toUpperCase()).filter(Boolean))].sort();
+  }
+
+  function renderSymbolSuggestions(query) {
+    const container = document.getElementById('alert-symbol-suggestions');
+    const q = String(query || '').trim().toUpperCase();
+    if (!q) {
+      container.classList.add('hidden');
+      container.innerHTML = '';
+      return;
+    }
+
+    const matches = alertSymbols.filter((symbol) => symbol.includes(q)).slice(0, 12);
+    if (!matches.length) {
+      container.classList.add('hidden');
+      container.innerHTML = '';
+      return;
+    }
+
+    container.innerHTML = matches.map((symbol) => `
+      <button
+        type="button"
+        class="symbol-suggestion block w-full rounded px-2 py-1 text-left text-sm text-gray-200 hover:bg-gray-800"
+        data-symbol="${symbol}"
+      >
+        ${symbol}
+      </button>
+    `).join('');
+    container.classList.remove('hidden');
+
+    container.querySelectorAll('.symbol-suggestion').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.getElementById('alert-symbol').value = btn.dataset.symbol || '';
+        container.classList.add('hidden');
+        container.innerHTML = '';
+      });
+    });
+  }
+
+  // Clock
+  setInterval(() => {
+    document.getElementById('clock').textContent =
+      '🕐 ' + new Date().toLocaleString('en-PK', { timeZone: 'Asia/Karachi' });
+  }, 1000);
+
+  // Countdown
+  setInterval(() => {
+    refreshTimer--;
+    if (refreshTimer <= 0) refreshTimer = 300;
+    const m = Math.floor(refreshTimer / 60);
+    const s = refreshTimer % 60;
+    document.getElementById('countdown').textContent =
+      `Refreshing in ${m}m ${s}s`;
+  }, 1000);
+
+  // Populate sector dropdown
+  function populateSectors(stocks) {
+    const sectors = [...new Set(stocks.map(s => s.sector))].sort();
+    const sel = document.getElementById('sectorFilter');
+    sel.innerHTML = '<option value="">All Sectors</option>';
+    sectors.forEach(sec => {
+      const opt = document.createElement('option');
+      opt.value = sec;
+      opt.textContent = sec;
+      sel.appendChild(opt);
+    });
+  }
+
+  // Apply filters + sorting
+  function applyFilters() {
+    const q = document.getElementById('search').value.toLowerCase();
+    const sector = document.getElementById('sectorFilter').value;
+    const sortBy = document.getElementById('sortBy').value;
+    const watchlistOnly = document.getElementById('watchlistOnly').checked;
+
+    let filtered = allStocks.filter(s => {
+      const matchSearch = s.name.toLowerCase().includes(q) ||
+                          s.sector.toLowerCase().includes(q);
+      const matchSector = !sector || s.sector === sector;
+      const matchWatchlist = !watchlistOnly || watchlist.has(s.symbol);
+      return matchSearch && matchSector && matchWatchlist;
+    });
+
+    const [field, dir] = sortBy.split('_');
+    filtered.sort((a, b) => {
+      const va = parseFloat(a[field]) || 0;
+      const vb = parseFloat(b[field]) || 0;
+      return dir === 'desc' ? vb - va : va - vb;
+    });
+
+    document.getElementById('stock-count').textContent =
+      `Showing ${filtered.length} of ${allStocks.length} stocks`;
+    renderStocks(filtered);
+  }
+
+  // Render stock cards
+  function renderStocks(stocks) {
+    const container = document.getElementById('stocks');
+    container.innerHTML = stocks.map((s, index) => {
+      const isUp = parseFloat(s.changePercent) >= 0;
+      const color = isUp ? 'text-green-400' : 'text-red-400';
+      const border = isUp ? 'border-green-800 bg-green-950/30' : 'border-red-800 bg-red-950/30';
+      const arrow = isUp ? '▲' : '▼';
+      const starred = watchlist.has(s.symbol);
+      return `
+        <div
+          class="stock-card cursor-pointer border ${border} rounded-xl p-3 text-left transition hover:scale-[1.01] hover:border-green-500"
+          data-index="${index}"
+        >
+          <div class="flex justify-between items-start mb-1">
+            <div>
+              <span class="font-bold text-sm">${s.name}</span>
+              <p class="text-gray-500 text-xs">${s.sector}</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button type="button" class="watch-btn rounded px-1 text-lg leading-none ${starred ? 'text-yellow-300' : 'text-gray-500 hover:text-yellow-300'}" data-symbol="${s.symbol}" title="Toggle watchlist">
+                ${starred ? '★' : '☆'}
+              </button>
+              <span class="${color} font-bold text-sm">${arrow} ${Math.abs(s.changePercent)}%</span>
+            </div>
+          </div>
+          <div class="text-xl font-bold mb-1">PKR ${parseFloat(s.price).toLocaleString()}</div>
+          <div class="grid grid-cols-2 gap-x-2 text-xs text-gray-400">
+            <span>Change: <span class="${color}">${s.change}</span></span>
+            <span>Vol: ${parseInt(s.volume).toLocaleString()}</span>
+            <span>H: ${s.high}</span>
+            <span>L: ${s.low}</span>
+          </div>
+        </div>`;
+    }).join('');
+
+    container.querySelectorAll('.stock-card').forEach((card) => {
+      card.addEventListener('click', () => {
+        const stock = stocks[Number(card.dataset.index)];
+        if (stock) openStockModal(stock);
+      });
+    });
+
+    container.querySelectorAll('.watch-btn').forEach((btn) => {
+      btn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        toggleWatchlist(btn.dataset.symbol);
+      });
+    });
+  }
+
+  function formatNumber(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return '--';
+    return num.toLocaleString();
+  }
+
+  function openStockModal(stock) {
+    const modal = document.getElementById('stock-modal');
+    const isUp = parseFloat(stock.changePercent) >= 0;
+
+    document.getElementById('modal-symbol').textContent = `${stock.symbol} • ${stock.sector}`;
+    document.getElementById('modal-name').textContent = stock.name;
+    document.getElementById('modal-price').textContent = `PKR ${formatNumber(stock.price)}`;
+
+    const changeEl = document.getElementById('modal-change');
+    changeEl.textContent = `${isUp ? '▲' : '▼'} ${Math.abs(parseFloat(stock.changePercent) || 0).toFixed(2)}% (${stock.change})`;
+    changeEl.className = `mt-1 text-lg font-semibold ${isUp ? 'text-green-400' : 'text-red-400'}`;
+
+    document.getElementById('modal-open').textContent = formatNumber(stock.open);
+    document.getElementById('modal-high').textContent = formatNumber(stock.high);
+    document.getElementById('modal-low').textContent = formatNumber(stock.low);
+    document.getElementById('modal-close-value').textContent = formatNumber(stock.ldcp);
+
+    const chartCtx = document.getElementById('volume-chart').getContext('2d');
+    if (volumeChart) volumeChart.destroy();
+    volumeChart = new Chart(chartCtx, {
+      type: 'bar',
+      data: {
+        labels: ['Open', 'High', 'Low', 'Close'],
+        datasets: [
+          {
+            type: 'line',
+            label: `${stock.symbol} Price`,
+            data: [
+              Number(stock.open) || 0,
+              Number(stock.high) || 0,
+              Number(stock.low) || 0,
+              Number(stock.ldcp) || 0,
+            ],
+            borderColor: isUp ? 'rgb(74, 222, 128)' : 'rgb(248, 113, 113)',
+            backgroundColor: isUp ? 'rgba(74, 222, 128, 0.15)' : 'rgba(248, 113, 113, 0.15)',
+            tension: 0.35,
+            fill: true,
+            pointRadius: 4,
+            pointBackgroundColor: isUp ? 'rgb(74, 222, 128)' : 'rgb(248, 113, 113)',
+            yAxisID: 'yPrice',
+          },
+          {
+            type: 'bar',
+            label: 'Volume',
+            data: [
+              parseInt(stock.volume, 10) || 0,
+              parseInt(stock.volume, 10) || 0,
+              parseInt(stock.volume, 10) || 0,
+              parseInt(stock.volume, 10) || 0,
+            ],
+            backgroundColor: 'rgba(147, 197, 253, 0.30)',
+            borderColor: 'rgba(147, 197, 253, 0.80)',
+            borderWidth: 1,
+            borderRadius: 6,
+            yAxisID: 'yVolume',
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color: '#d1d5db' } },
+        },
+        scales: {
+          x: { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(75,85,99,0.3)' } },
+          yPrice: {
+            position: 'left',
+            ticks: {
+              color: '#9ca3af',
+              callback: (value) => Number(value).toLocaleString(),
+            },
+            grid: { color: 'rgba(75,85,99,0.3)' },
+          },
+          yVolume: {
+            position: 'right',
+            ticks: {
+              color: '#93c5fd',
+              callback: (value) => Number(value).toLocaleString(),
+            },
+            grid: { drawOnChartArea: false },
+          },
+        },
+      },
+    });
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+
+  function closeStockModal() {
+    const modal = document.getElementById('stock-modal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+
+  document.getElementById('modal-close').addEventListener('click', closeStockModal);
+  document.getElementById('stock-modal').addEventListener('click', (event) => {
+    if (event.target.id === 'stock-modal') closeStockModal();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeStockModal();
+  });
+
+  // Render gainers & losers
+  function renderGainersLosers(stocks) {
+    const real = stocks.filter(s => parseFloat(s.volume) > 1000);
+    const sorted = [...real].sort((a, b) =>
+      parseFloat(b.changePercent) - parseFloat(a.changePercent));
+
+    const top5 = sorted.slice(0, 5);
+    const bot5 = sorted.slice(-5).reverse();
+
+    document.getElementById('gainers').innerHTML = top5.map(s => `
+      <div class="flex justify-between items-center py-1 border-b border-gray-800">
+        <div>
+          <span class="font-semibold text-sm">${s.name}</span>
+          <span class="text-gray-500 text-xs ml-2">PKR ${s.price}</span>
+        </div>
+        <span class="text-green-400 font-bold text-sm">▲ ${s.changePercent}%</span>
+      </div>`).join('');
+
+    document.getElementById('losers').innerHTML = bot5.map(s => `
+      <div class="flex justify-between items-center py-1 border-b border-gray-800">
+        <div>
+          <span class="font-semibold text-sm">${s.name}</span>
+          <span class="text-gray-500 text-xs ml-2">PKR ${s.price}</span>
+        </div>
+        <span class="text-red-400 font-bold text-sm">▼ ${Math.abs(s.changePercent)}%</span>
+      </div>`).join('');
+  }
+
+  // Fetch data
+  async function loadStocks() {
+    try {
+      const res = await fetch('/api/stocks');
+      const json = await res.json();
+      allStocks = json.data;
+      refreshTimer = 300;
+
+      // Market summary
+      const s = json.summary;
+      document.getElementById('mkt-status').textContent = s.status || '--';
+      document.getElementById('mkt-status').className =
+        s.status === 'Open' ? 'text-lg font-bold text-green-400' : 'text-lg font-bold text-red-400';
+      document.getElementById('mkt-volume').textContent = s.volume || '--';
+      document.getElementById('mkt-adv').innerHTML =
+        `<span class="text-green-400">${s.advanced}</span> / <span class="text-red-400">${s.declined}</span>`;
+      document.getElementById('mkt-trades').textContent = s.trades || '--';
+      document.getElementById('updated').textContent = '✅ Updated: ' + json.updated;
+
+      populateSectors(allStocks);
+      updateAlertSuggestions(allStocks);
+      renderGainersLosers(allStocks);
+      evaluateAlerts(allStocks);
+      applyFilters();
+    } catch (err) {
+      document.getElementById('updated').textContent = '❌ Failed to fetch';
+    }
+  }
+
+  document.getElementById('add-alert-btn').addEventListener('click', addAlert);
+  document.getElementById('clear-alerts-btn').addEventListener('click', clearTriggeredAlerts);
+  document.getElementById('alert-symbol').addEventListener('input', (event) => {
+    renderSymbolSuggestions(event.target.value);
+  });
+  document.getElementById('alert-symbol').addEventListener('blur', () => {
+    setTimeout(() => {
+      const container = document.getElementById('alert-symbol-suggestions');
+      container.classList.add('hidden');
+    }, 120);
+  });
+  document.getElementById('alert-symbol').addEventListener('focus', (event) => {
+    renderSymbolSuggestions(event.target.value);
+  });
+  document.getElementById('alert-target').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') addAlert();
+  });
+  document.getElementById('alert-symbol').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') addAlert();
+  });
+
+  renderWatchlistChips();
+  renderAlerts();
+
+  loadStocks();
+  setInterval(loadStocks, 300000); // Refresh every 5 mins
+</script>
+</body>
+</html>
