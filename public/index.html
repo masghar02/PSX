@@ -6,6 +6,9 @@
   <title>PSX Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/luxon@3/build/global/luxon.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1/dist/chartjs-adapter-luxon.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.1.1/dist/chartjs-chart-financial.min.js"></script>
 </head>
 <body class="bg-gray-950 text-white min-h-screen p-4">
 <div class="max-w-7xl mx-auto">
@@ -42,6 +45,32 @@
       <p id="mkt-trades" class="text-lg font-bold">--</p>
     </div>
   </div>
+
+  <!-- KSE-100 Candlestick Chart -->
+<div class="mb-6 rounded-2xl border border-gray-700 bg-gray-900 p-4">
+  <div class="mb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+    <div>
+      <h2 class="text-lg font-bold text-white">KSE-100 Index</h2>
+      <p id="kse-subtitle" class="text-xs text-gray-400">Loading...</p>
+    </div>
+    <div class="flex items-center gap-4">
+      <div class="text-right">
+        <p id="kse-price" class="text-2xl font-bold text-white">--</p>
+        <p id="kse-change" class="text-sm font-semibold">--</p>
+      </div>
+      <div class="grid grid-cols-2 gap-x-4 text-xs text-gray-400">
+        <span>High: <span id="kse-high" class="text-white font-semibold">--</span></span>
+        <span>Low: <span id="kse-low" class="text-white font-semibold">--</span></span>
+        <span>Prev: <span id="kse-prev" class="text-white font-semibold">--</span></span>
+        <span>Vol: <span id="kse-vol" class="text-white font-semibold">--</span></span>
+      </div>
+    </div>
+  </div>
+  <div class="h-64 sm:h-80">
+    <canvas id="kse-chart"></canvas>
+  </div>
+  <p id="kse-error" class="hidden text-center text-sm text-red-400 mt-2"></p>
+</div>
 
   <!-- Last Updated & Refresh -->
   <div class="flex justify-between items-center mb-4">
@@ -749,6 +778,141 @@
 
   loadStocks();
   setInterval(loadStocks, 300000); // Refresh every 5 mins
+  // ── KSE-100 Candlestick Chart ────────────────────────────────────────────────
+let kseChart = null;
+
+async function loadKSE100Chart() {
+  // Update subtitle immediately so we know function is running
+  document.getElementById('kse-subtitle').textContent = 'KSE-100 • Connecting...';
+
+  try {
+    const res = await fetch(`${getApiBase()}/api/kse100`);
+    const json = await res.json();
+
+    console.log('KSE100 response:', json); // Debug log
+
+    if (!json.success || !json.candles || !json.candles.length) {
+      throw new Error(json.error || 'No candle data');
+    }
+
+    const m = json.meta;
+    const isUp = parseFloat(m.changePercent) >= 0;
+
+    // Update stats
+    document.getElementById('kse-price').textContent =
+      Number(m.currentPrice).toLocaleString('en-PK', { minimumFractionDigits: 2 });
+    document.getElementById('kse-high').textContent = Number(m.high).toLocaleString();
+    document.getElementById('kse-low').textContent  = Number(m.low).toLocaleString();
+    document.getElementById('kse-prev').textContent = Number(m.previousClose).toLocaleString();
+    document.getElementById('kse-vol').textContent  = Number(m.volume || 0).toLocaleString();
+    document.getElementById('kse-subtitle').textContent =
+      `KSE-100 • ${json.source} • PKR`;
+
+    const changeEl = document.getElementById('kse-change');
+    changeEl.textContent =
+      `${isUp ? '▲' : '▼'} ${Math.abs(m.changePercent)}%  (${isUp ? '+' : ''}${Number(m.change).toLocaleString()})`;
+    changeEl.className = `text-sm font-semibold ${isUp ? 'text-green-400' : 'text-red-400'}`;
+
+    document.getElementById('kse-error').classList.add('hidden');
+
+    // Use simple LINE chart (no external plugin needed)
+    const ctx = document.getElementById('kse-chart').getContext('2d');
+    if (kseChart) kseChart.destroy();
+
+    const labels = json.candles.map(c => new Date(c.t).toLocaleTimeString('en-PK', {
+      hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Karachi'
+    }));
+    const closes = json.candles.map(c => c.c);
+    const highs  = json.candles.map(c => c.h);
+    const lows   = json.candles.map(c => c.l);
+
+    const lineColor = isUp ? 'rgba(34,197,94,1)' : 'rgba(239,68,68,1)';
+    const fillColor = isUp ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)';
+
+    kseChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'KSE-100 Close',
+            data: closes,
+            borderColor: lineColor,
+            backgroundColor: fillColor,
+            borderWidth: 2,
+            fill: true,
+            tension: 0.3,
+            pointRadius: 0,
+            pointHoverRadius: 4,
+          },
+          {
+            label: 'High',
+            data: highs,
+            borderColor: 'rgba(34,197,94,0.3)',
+            borderWidth: 1,
+            borderDash: [4, 4],
+            fill: false,
+            tension: 0.3,
+            pointRadius: 0,
+          },
+          {
+            label: 'Low',
+            data: lows,
+            borderColor: 'rgba(239,68,68,0.3)',
+            borderWidth: 1,
+            borderDash: [4, 4],
+            fill: false,
+            tension: 0.3,
+            pointRadius: 0,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: {
+            labels: { color: '#9ca3af', boxWidth: 12 },
+          },
+          tooltip: {
+            callbacks: {
+              label: ctx => `${ctx.dataset.label}: ${Number(ctx.raw).toLocaleString()}`,
+            },
+          },
+        },
+        scales: {
+          x: {
+            ticks: {
+              color: '#9ca3af',
+              maxTicksLimit: 10,
+              maxRotation: 0,
+            },
+            grid: { color: 'rgba(75,85,99,0.2)' },
+          },
+          y: {
+            position: 'right',
+            ticks: {
+              color: '#9ca3af',
+              callback: v => Number(v).toLocaleString(),
+            },
+            grid: { color: 'rgba(75,85,99,0.2)' },
+          },
+        },
+      },
+    });
+
+  } catch (err) {
+    console.error('KSE chart error:', err);
+    document.getElementById('kse-subtitle').textContent = 'KSE-100 • Error';
+    document.getElementById('kse-error').textContent = '⚠️ ' + err.message;
+    document.getElementById('kse-error').classList.remove('hidden');
+  }
+}
+
+loadKSE100Chart();
+setInterval(loadKSE100Chart, 300000);
+
 </script>
 </body>
 </html>
