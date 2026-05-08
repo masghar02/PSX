@@ -782,52 +782,47 @@
 let kseChart = null;
 
 async function loadKSE100Chart() {
-  // Update subtitle immediately so we know function is running
-  document.getElementById('kse-subtitle').textContent = 'KSE-100 • Connecting...';
-
+  document.getElementById('kse-subtitle').textContent = 'KSE-100 • Loading...';
   try {
-    const res = await fetch(`${getApiBase()}/api/kse100`);
+    const res  = await fetch(`${getApiBase()}/api/kse100`);
     const json = await res.json();
+    if (!json.success || !json.candles?.length) throw new Error(json.error || 'No data');
 
-    console.log('KSE100 response:', json); // Debug log
-
-    if (!json.success || !json.candles || !json.candles.length) {
-      throw new Error(json.error || 'No candle data');
-    }
-
-    const m = json.meta;
+    const m    = json.meta;
     const isUp = parseFloat(m.changePercent) >= 0;
 
-    // Update stats
     document.getElementById('kse-price').textContent =
       Number(m.currentPrice).toLocaleString('en-PK', { minimumFractionDigits: 2 });
-    document.getElementById('kse-high').textContent = Number(m.high).toLocaleString();
-    document.getElementById('kse-low').textContent  = Number(m.low).toLocaleString();
-    document.getElementById('kse-prev').textContent = Number(m.previousClose).toLocaleString();
-    document.getElementById('kse-vol').textContent  = Number(m.volume || 0).toLocaleString();
+    document.getElementById('kse-high').textContent  = Number(m.high).toLocaleString();
+    document.getElementById('kse-low').textContent   = Number(m.low).toLocaleString();
+    document.getElementById('kse-prev').textContent  = Number(m.previousClose).toLocaleString();
+    document.getElementById('kse-vol').textContent   = Number(m.volume || 0).toLocaleString();
     document.getElementById('kse-subtitle').textContent =
-      `KSE-100 • ${json.source} • PKR`;
+      `KSE-100 • Intraday 5-min • ${json.source === 'simulated' ? 'Simulated' : 'Live'} • PKR`;
 
     const changeEl = document.getElementById('kse-change');
     changeEl.textContent =
       `${isUp ? '▲' : '▼'} ${Math.abs(m.changePercent)}%  (${isUp ? '+' : ''}${Number(m.change).toLocaleString()})`;
     changeEl.className = `text-sm font-semibold ${isUp ? 'text-green-400' : 'text-red-400'}`;
-
     document.getElementById('kse-error').classList.add('hidden');
 
-    // Use simple LINE chart (no external plugin needed)
+    // Labels = time strings
+    const labels = json.candles.map(c =>
+      new Date(c.t).toLocaleTimeString('en-PK', {
+        hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Karachi'
+      })
+    );
+    const closes = json.candles.map(c => +c.c);
+    const highs  = json.candles.map(c => +c.h);
+    const lows   = json.candles.map(c => +c.l);
+
+    const lineColor = isUp ? 'rgba(34,197,94,1)'    : 'rgba(239,68,68,1)';
+    const fillColor = isUp ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)';
+    const highColor = 'rgba(34,197,94,0.4)';
+    const lowColor  = 'rgba(239,68,68,0.4)';
+
     const ctx = document.getElementById('kse-chart').getContext('2d');
     if (kseChart) kseChart.destroy();
-
-    const labels = json.candles.map(c => new Date(c.t).toLocaleTimeString('en-PK', {
-      hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Karachi'
-    }));
-    const closes = json.candles.map(c => c.c);
-    const highs  = json.candles.map(c => c.h);
-    const lows   = json.candles.map(c => c.l);
-
-    const lineColor = isUp ? 'rgba(34,197,94,1)' : 'rgba(239,68,68,1)';
-    const fillColor = isUp ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)';
 
     kseChart = new Chart(ctx, {
       type: 'line',
@@ -835,35 +830,39 @@ async function loadKSE100Chart() {
         labels,
         datasets: [
           {
-            label: 'KSE-100 Close',
+            label: 'Close',
             data: closes,
             borderColor: lineColor,
             backgroundColor: fillColor,
-            borderWidth: 2,
+            borderWidth: 2.5,
             fill: true,
-            tension: 0.3,
+            tension: 0.4,
             pointRadius: 0,
-            pointHoverRadius: 4,
+            pointHoverRadius: 5,
+            pointHoverBackgroundColor: lineColor,
+            order: 1,
           },
           {
             label: 'High',
             data: highs,
-            borderColor: 'rgba(34,197,94,0.3)',
+            borderColor: highColor,
             borderWidth: 1,
-            borderDash: [4, 4],
+            borderDash: [3, 3],
             fill: false,
-            tension: 0.3,
+            tension: 0.4,
             pointRadius: 0,
+            order: 2,
           },
           {
             label: 'Low',
             data: lows,
-            borderColor: 'rgba(239,68,68,0.3)',
+            borderColor: lowColor,
             borderWidth: 1,
-            borderDash: [4, 4],
+            borderDash: [3, 3],
             fill: false,
-            tension: 0.3,
+            tension: 0.4,
             pointRadius: 0,
+            order: 3,
           },
         ],
       },
@@ -873,30 +872,32 @@ async function loadKSE100Chart() {
         interaction: { mode: 'index', intersect: false },
         plugins: {
           legend: {
-            labels: { color: '#9ca3af', boxWidth: 12 },
+            labels: { color: '#9ca3af', boxWidth: 10, font: { size: 11 } },
           },
           tooltip: {
+            backgroundColor: '#1f2937',
+            borderColor: '#374151',
+            borderWidth: 1,
+            titleColor: '#f9fafb',
+            bodyColor: '#d1d5db',
             callbacks: {
-              label: ctx => `${ctx.dataset.label}: ${Number(ctx.raw).toLocaleString()}`,
+              label: ctx =>
+                ` ${ctx.dataset.label}: PKR ${Number(ctx.raw).toLocaleString()}`,
             },
           },
         },
         scales: {
           x: {
-            ticks: {
-              color: '#9ca3af',
-              maxTicksLimit: 10,
-              maxRotation: 0,
-            },
-            grid: { color: 'rgba(75,85,99,0.2)' },
+            ticks: { color: '#6b7280', maxTicksLimit: 8, maxRotation: 0 },
+            grid:  { color: 'rgba(55,65,81,0.5)' },
           },
           y: {
             position: 'right',
             ticks: {
-              color: '#9ca3af',
+              color: '#6b7280',
               callback: v => Number(v).toLocaleString(),
             },
-            grid: { color: 'rgba(75,85,99,0.2)' },
+            grid: { color: 'rgba(55,65,81,0.5)' },
           },
         },
       },
@@ -905,10 +906,13 @@ async function loadKSE100Chart() {
   } catch (err) {
     console.error('KSE chart error:', err);
     document.getElementById('kse-subtitle').textContent = 'KSE-100 • Error';
-    document.getElementById('kse-error').textContent = '⚠️ ' + err.message;
+    document.getElementById('kse-error').textContent    = '⚠️ ' + err.message;
     document.getElementById('kse-error').classList.remove('hidden');
   }
 }
+
+loadKSE100Chart();
+setInterval(loadKSE100Chart, 300000);
 
 loadKSE100Chart();
 setInterval(loadKSE100Chart, 300000);
