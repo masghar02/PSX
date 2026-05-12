@@ -3,12 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>PSX Dashboard</title>
+  <title>PSX Watch</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/luxon@3/build/global/luxon.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1/dist/chartjs-adapter-luxon.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.1.1/dist/chartjs-chart-financial.min.js"></script>
+
 </head>
 <body class="bg-gray-950 text-white min-h-screen p-4">
 <div class="max-w-7xl mx-auto">
@@ -22,8 +25,24 @@
       >
         Sector Performance
       </a>
-      <span id="clock" class="text-gray-400 text-sm"></span>
+      
+      <a
+  href="/ai-predictions.html"
+  class="rounded-lg border border-cyan-700 bg-cyan-900/40 px-3 py-1 text-xs text-cyan-200 hover:bg-cyan-800/50"
+>
+  AI Predictions
+</a>
+<a
+  href="/gold-silver.html"
+  class="rounded-lg border border-cyan-700 bg-cyan-900/40 px-3 py-1 text-xs text-cyan-200 hover:bg-cyan-800/50"
+>
+  Gold & Silver Price
+</a>
+<!-- City Prices -->
+
+<span id="clock" class="text-gray-400 text-sm"></span>
     </div>
+   
   </div>
 
   <!-- Market Summary Banner -->
@@ -138,7 +157,7 @@
     <div id="alerts-list" class="space-y-2"></div>
   </div>
 
-  <!-- Top Gainers & Losers -->
+    <!-- Top Gainers & Losers -->
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
     <div class="bg-gray-900 rounded-xl p-4">
       <h2 class="text-green-400 font-bold mb-3">🏆 Top 5 Gainers</h2>
@@ -542,31 +561,31 @@
       const arrow = isUp ? '▲' : '▼';
       const starred = watchlist.has(s.symbol);
       return `
-        <div
+       <div
           class="stock-card cursor-pointer border ${border} rounded-xl p-3 text-left transition hover:scale-[1.01] hover:border-green-500"
-          data-index="${index}"
-        >
+  data-index="${index}"
+>
           <div class="flex justify-between items-start mb-1">
-            <div>
+    <div>
               <span class="font-bold text-sm">${s.name}</span>
               <p class="text-gray-500 text-xs">${s.sector}</p>
-            </div>
-            <div class="flex items-center gap-2">
+    </div>
+    <div class="flex items-center gap-2">
               <button type="button" class="watch-btn rounded px-1 text-lg leading-none ${starred ? 'text-yellow-300' : 'text-gray-500 hover:text-yellow-300'}" data-symbol="${s.symbol}" title="Toggle watchlist">
-                ${starred ? '★' : '☆'}
-              </button>
+        ${starred ? '★' : '☆'}
+      </button>
               <span class="${color} font-bold text-sm">${arrow} ${Math.abs(s.changePercent)}%</span>
-            </div>
-          </div>
+      </div>
+    </div>
           <div class="text-xl font-bold mb-1">PKR ${parseFloat(s.price).toLocaleString()}</div>
           <div class="grid grid-cols-2 gap-x-2 text-xs text-gray-400">
             <span>Change: <span class="${color}">${s.change}</span></span>
             <span>Vol: ${parseInt(s.volume).toLocaleString()}</span>
             <span>H: ${s.high}</span>
             <span>L: ${s.low}</span>
-          </div>
+  </div>
         </div>`;
-    }).join('');
+}).join('');
 
     container.querySelectorAll('.stock-card').forEach((card) => {
       card.addEventListener('click', () => {
@@ -582,144 +601,257 @@
       });
     });
   }
+function renderGainersLosers(stocks) {
+  if (!Array.isArray(stocks)) return;
 
+  const clean = stocks
+    .filter(s => Number(s.price) > 0 && !isNaN(Number(s.changePercent)));
+
+  const sorted = [...clean].sort(
+    (a, b) => Number(b.changePercent) - Number(a.changePercent)
+  );
+
+  const gainers = sorted.slice(0, 5);
+  const losers = sorted.slice(-5).reverse();
+
+  document.getElementById('gainers').innerHTML = gainers.map(s => {
+    const up = Number(s.changePercent) >= 0;
+    return `
+      <div class="flex justify-between items-center py-1 border-b border-gray-800">
+        <div>
+          <span class="font-semibold text-sm">${s.symbol}</span>
+          <span class="text-gray-500 text-xs ml-2">
+            PKR ${Number(s.price).toLocaleString()}
+          </span>
+        </div>
+        <span class="${up ? 'text-green-400' : 'text-red-400'} font-bold text-sm">
+          ${up ? '▲' : '▼'} ${Math.abs(Number(s.changePercent)).toFixed(2)}%
+        </span>
+      </div>
+    `;
+  }).join('');
+
+  document.getElementById('losers').innerHTML = losers.map(s => {
+    const down = Number(s.changePercent) < 0;
+    return `
+      <div class="flex justify-between items-center py-1 border-b border-gray-800">
+        <div>
+          <span class="font-semibold text-sm">${s.symbol}</span>
+          <span class="text-gray-500 text-xs ml-2">
+            PKR ${Number(s.price).toLocaleString()}
+          </span>
+        </div>
+        <span class="${down ? 'text-red-400' : 'text-green-400'} font-bold text-sm">
+          ${down ? '▼' : '▲'} ${Math.abs(Number(s.changePercent)).toFixed(2)}%
+        </span>
+      </div>
+    `;
+  }).join('');
+}
+async function loadAIRecommendations() {
+  try {
+    const res = await fetch('/api/ai-recommendations');
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const json = await res.json();
+
+    const container = document.getElementById('ai-recommendations');
+
+    if (!json.recommendations?.length) {
+      container.innerHTML = `
+        <p class="text-gray-400 text-sm">No AI signals available yet.</p>
+      `;
+      return;
+    }
+
+    container.innerHTML = json.recommendations.map(stock => `
+      <div class="border border-gray-700 rounded-lg p-3 mb-2 bg-gray-950">
+        <div class="flex justify-between items-center">
+          <div>
+            <h3 class="font-bold text-white">${stock.symbol}</h3>
+            <p class="text-xs text-gray-400">${stock.sector}</p>
+          </div>
+
+          <div class="text-right">
+            <p class="text-cyan-400 font-bold">
+              Score: ${stock.aiScore}
+            </p>
+
+            <p class="text-green-400 text-sm">
+              SHORT TERM BUY
+            </p>
+          </div>
+        </div>
+      </div>
+    `).join('');
+
+  } catch (err) {
+    console.error('AI recommendations failed:', err);
+    document.getElementById('ai-recommendations').innerHTML =
+      `<p class="text-red-400 text-sm">AI engine not responding</p>`;
+  }
+}
   function formatNumber(value) {
     const num = Number(value);
     if (!Number.isFinite(num)) return '--';
     return num.toLocaleString();
   }
 
-  function openStockModal(stock) {
-    const modal = document.getElementById('stock-modal');
-    const isUp = parseFloat(stock.changePercent) >= 0;
+  async function analyzeStock(stock) {
 
-    document.getElementById('modal-symbol').textContent = `${stock.symbol} • ${stock.sector}`;
-    document.getElementById('modal-name').textContent = stock.name;
-    document.getElementById('modal-price').textContent = `PKR ${formatNumber(stock.price)}`;
+  try {
 
-    const changeEl = document.getElementById('modal-change');
-    changeEl.textContent = `${isUp ? '▲' : '▼'} ${Math.abs(parseFloat(stock.changePercent) || 0).toFixed(2)}% (${stock.change})`;
-    changeEl.className = `mt-1 text-lg font-semibold ${isUp ? 'text-green-400' : 'text-red-400'}`;
+    const res = await fetch(`/api/history/${stock.symbol}`);
+    const json = await res.json();
 
-    document.getElementById('modal-open').textContent = formatNumber(stock.open);
-    document.getElementById('modal-high').textContent = formatNumber(stock.high);
-    document.getElementById('modal-low').textContent = formatNumber(stock.low);
-    document.getElementById('modal-close-value').textContent = formatNumber(stock.ldcp);
+    if (!json.success || !json.candles.length) {
+      return null;
+    }
 
-    const chartCtx = document.getElementById('volume-chart').getContext('2d');
-    if (volumeChart) volumeChart.destroy();
-    volumeChart = new Chart(chartCtx, {
-      type: 'bar',
-      data: {
-        labels: ['Open', 'High', 'Low', 'Close'],
-        datasets: [
-          {
-            type: 'line',
-            label: `${stock.symbol} Price`,
-            data: [
-              Number(stock.open) || 0,
-              Number(stock.high) || 0,
-              Number(stock.low) || 0,
-              Number(stock.ldcp) || 0,
-            ],
-            borderColor: isUp ? 'rgb(74, 222, 128)' : 'rgb(248, 113, 113)',
-            backgroundColor: isUp ? 'rgba(74, 222, 128, 0.15)' : 'rgba(248, 113, 113, 0.15)',
-            tension: 0.35,
-            fill: true,
-            pointRadius: 4,
-            pointBackgroundColor: isUp ? 'rgb(74, 222, 128)' : 'rgb(248, 113, 113)',
-            yAxisID: 'yPrice',
-          },
-          {
-            type: 'bar',
-            label: 'Volume',
-            data: [
-              parseInt(stock.volume, 10) || 0,
-              parseInt(stock.volume, 10) || 0,
-              parseInt(stock.volume, 10) || 0,
-              parseInt(stock.volume, 10) || 0,
-            ],
-            backgroundColor: 'rgba(147, 197, 253, 0.30)',
-            borderColor: 'rgba(147, 197, 253, 0.80)',
-            borderWidth: 1,
-            borderRadius: 6,
-            yAxisID: 'yVolume',
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { labels: { color: '#d1d5db' } },
-        },
-        scales: {
-          x: { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(75,85,99,0.3)' } },
-          yPrice: {
-            position: 'left',
-            ticks: {
-              color: '#9ca3af',
-              callback: (value) => Number(value).toLocaleString(),
-            },
-            grid: { color: 'rgba(75,85,99,0.3)' },
-          },
-          yVolume: {
-            position: 'right',
-            ticks: {
-              color: '#93c5fd',
-              callback: (value) => Number(value).toLocaleString(),
-            },
-            grid: { drawOnChartArea: false },
-          },
-        },
-      },
-    });
+    const closes = json.candles.map(c => c.close).filter(Boolean);
 
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
+    if (closes.length < 200) {
+      return null;
+    }
+
+    // ===== MOVING AVERAGES =====
+
+    const sma50 =
+      closes.slice(-50).reduce((a, b) => a + b, 0) / 50;
+
+    const sma200 =
+      closes.slice(-200).reduce((a, b) => a + b, 0) / 200;
+
+    const current =
+      closes[closes.length - 1];
+
+    const first =
+      closes[0];
+
+    // ===== LONG TERM TREND =====
+
+    const growth3Y =
+      ((current - first) / first) * 100;
+
+    // ===== VOLATILITY =====
+
+    const volatility =
+      Math.abs(
+        ((Math.max(...closes.slice(-90)) -
+        Math.min(...closes.slice(-90))) / current) * 100
+      );
+
+    // ===== MOMENTUM =====
+
+    const momentum =
+      ((current - sma50) / sma50) * 100;
+
+    // ===== SCORES =====
+
+    let shortScore = 0;
+    let longScore = 0;
+
+    // SHORT TERM
+    if (current > sma50) shortScore += 30;
+    if (momentum > 5) shortScore += 30;
+    if (volatility < 18) shortScore += 20;
+    if (stock.volume > 500000) shortScore += 20;
+
+    // LONG TERM
+    if (current > sma200) longScore += 35;
+    if (growth3Y > 40) longScore += 35;
+    if (volatility < 25) longScore += 15;
+    if (stock.volume > 1000000) longScore += 15;
+
+    return {
+      symbol: stock.symbol,
+      sector: stock.sector,
+      price: stock.price,
+      volume: stock.volume,
+
+      shortScore: Math.min(shortScore, 99),
+      longScore: Math.min(longScore, 99),
+
+      growth3Y: growth3Y.toFixed(1),
+      momentum: momentum.toFixed(1),
+      volatility: volatility.toFixed(1),
+    };
+
+  } catch (err) {
+    console.error(stock.symbol, err);
+    return null;
   }
+}
 
-  function closeStockModal() {
-    const modal = document.getElementById('stock-modal');
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
-  }
 
-  document.getElementById('modal-close').addEventListener('click', closeStockModal);
-  document.getElementById('stock-modal').addEventListener('click', (event) => {
-    if (event.target.id === 'stock-modal') closeStockModal();
-  });
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') closeStockModal();
-  });
+async function loadAILongTerm() {
+  try {
+    const res = await fetch('/api/ai-longterm');
+    const json = await res.json();
 
-  // Render gainers & losers
-  function renderGainersLosers(stocks) {
-    const real = stocks.filter(s => parseFloat(s.volume) > 1000);
-    const sorted = [...real].sort((a, b) =>
-      parseFloat(b.changePercent) - parseFloat(a.changePercent));
+    const container = document.getElementById('ai-longterm');
 
-    const top5 = sorted.slice(0, 5);
-    const bot5 = sorted.slice(-5).reverse();
-
-    document.getElementById('gainers').innerHTML = top5.map(s => `
-      <div class="flex justify-between items-center py-1 border-b border-gray-800">
-        <div>
-          <span class="font-semibold text-sm">${s.name}</span>
-          <span class="text-gray-500 text-xs ml-2">PKR ${s.price}</span>
+    container.innerHTML = json.recommendations.map(s => `
+      <div class="border border-gray-700 rounded-lg p-3 mb-2 bg-gray-950">
+        <div class="flex justify-between">
+          <div>
+            <h3 class="font-bold">${s.symbol}</h3>
+            <p class="text-xs text-gray-400">${s.sector}</p>
+          </div>
+          <div class="text-right">
+            <p class="text-purple-400 font-bold">${s.aiScore}</p>
+            <p class="text-xs text-gray-400">${s.trend} • ${s.risk}</p>
+          </div>
         </div>
-        <span class="text-green-400 font-bold text-sm">▲ ${s.changePercent}%</span>
-      </div>`).join('');
+      </div>
+    `).join('');
 
-    document.getElementById('losers').innerHTML = bot5.map(s => `
-      <div class="flex justify-between items-center py-1 border-b border-gray-800">
-        <div>
-          <span class="font-semibold text-sm">${s.name}</span>
-          <span class="text-gray-500 text-xs ml-2">PKR ${s.price}</span>
-        </div>
-        <span class="text-red-400 font-bold text-sm">▼ ${Math.abs(s.changePercent)}%</span>
-      </div>`).join('');
+  } catch (err) {
+    console.error(err);
   }
+}
+async function loadAIPredictions() {
+  try {
+    const res = await fetch('/api/ai-predictions');
+    const json = await res.json();
+
+    if (!json.success) return;
+
+    const container = document.getElementById('ai-recommendations');
+
+    container.innerHTML = json.predictions.map(p => {
+      const longColor = p.longTermSignal === "BUY" ? "text-green-400" : "text-yellow-400";
+      const shortColor = p.shortTermSignal === "BUY" ? "text-green-300" : "text-yellow-300";
+
+      return `
+        <div class="border border-gray-700 rounded-lg p-3 mb-2 bg-gray-950">
+          <div class="flex justify-between items-center">
+            
+            <div>
+              <div class="font-bold text-white">${p.symbol}</div>
+              <div class="text-xs text-gray-400">${p.sector}</div>
+              <div class="text-xs text-gray-500">Price: ${p.price}</div>
+            </div>
+
+            <div class="text-right">
+              <div class="${longColor} text-sm font-semibold">
+                Long: ${p.longTermSignal} (${p.longTermScore})
+              </div>
+              <div class="${shortColor} text-sm font-semibold">
+                Short: ${p.shortTermSignal} (${p.shortTermScore})
+              </div>
+            </div>
+
+          </div>
+        </div>
+      `;
+    }).join('');
+
+  } catch (err) {
+    console.error("AI Prediction Error:", err);
+  }
+}
 
   // Fetch data
   async function loadStocks() {
@@ -741,7 +873,9 @@
 
       populateSectors(allStocks);
       updateAlertSuggestions(allStocks);
-      renderGainersLosers(allStocks);
+       renderGainersLosers(allStocks);
+      await loadAIPredictions();
+      // renderAIPredictions(allStocks);
       evaluateAlerts(allStocks);
       applyFilters();
     } catch (err) {
@@ -749,7 +883,6 @@
       document.getElementById('updated').textContent = `❌ Failed to fetch: ${message}`;
     }
   }
-
   document.getElementById('add-alert-btn').addEventListener('click', addAlert);
   document.getElementById('clear-alerts-btn').addEventListener('click', clearTriggeredAlerts);
   document.getElementById('alert-symbol').addEventListener('input', (event) => {
@@ -775,9 +908,179 @@
 
   renderWatchlistChips();
   renderAlerts();
+//   function renderAIPredictions(stocks) {
 
+//   // SHORT TERM LOGIC
+//   // High momentum + high volume
+
+//   const shortTerm = [...stocks]
+//     .filter(s =>
+//       parseFloat(s.volume) > 100000 &&
+//       parseFloat(s.changePercent) > 2
+//     )
+//     .sort((a, b) =>
+//       parseFloat(b.changePercent) - parseFloat(a.changePercent)
+//     )
+//     .slice(0, 5);
+
+//   // LONG TERM LOGIC
+//   // Stable price + strong volume + not overextended
+
+//   const longTerm = [...stocks]
+//     .filter(s =>
+//       parseFloat(s.price) > 20 &&
+//       parseFloat(s.volume) > 500000 &&
+//       Math.abs(parseFloat(s.changePercent)) < 6
+//     )
+//     .sort((a, b) =>
+//       parseFloat(b.volume) - parseFloat(a.volume)
+//     )
+//     .slice(0, 5);
+
+//   // Render Short-Term
+//   document.getElementById('ai-short-term').innerHTML =
+//     shortTerm.map(stock => {
+
+//       const confidence =
+//         Math.min(
+//           95,
+//           Math.round(
+//             parseFloat(stock.changePercent) * 8 +
+//             Math.log10(stock.volume) * 10
+//           )
+//         );
+
+//       return `
+//         <div class="rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-4 hover:border-cyan-400 transition">
+
+//           <div class="flex items-start justify-between">
+
+//             <div>
+//               <h3 class="text-lg font-bold text-white">
+//                 ${stock.symbol}
+//               </h3>
+
+//               <p class="text-xs text-gray-500 uppercase mt-1">
+//                 ${stock.sector}
+//               </p>
+//             </div>
+
+//             <div class="text-right">
+//               <p class="text-cyan-400 font-bold">
+//                 ${confidence}% Confidence
+//               </p>
+
+//               <p class="text-green-400 text-sm font-semibold">
+//                 BUY
+//               </p>
+//             </div>
+
+//           </div>
+
+//           <div class="grid grid-cols-3 gap-3 mt-4 text-sm">
+
+//             <div>
+//               <p class="text-gray-500">Price</p>
+//               <p class="text-white font-semibold">
+//                 PKR ${stock.price}
+//               </p>
+//             </div>
+
+//             <div>
+//               <p class="text-gray-500">Change</p>
+//               <p class="text-green-400 font-semibold">
+//                 +${stock.changePercent}%
+//               </p>
+//             </div>
+
+//             <div>
+//               <p class="text-gray-500">Volume</p>
+//               <p class="text-gray-300 font-semibold">
+//                 ${parseInt(stock.volume).toLocaleString()}
+//               </p>
+//             </div>
+
+//           </div>
+
+//         </div>
+//       `;
+//     }).join('');
+
+//   // Render Long-Term
+//   document.getElementById('ai-long-term').innerHTML =
+//     longTerm.map(stock => {
+
+//       const confidence =
+//         Math.min(
+//           98,
+//           Math.round(
+//             Math.log10(stock.volume) * 12 +
+//             (100 - Math.abs(stock.changePercent * 5))
+//           )
+//         );
+
+//       return `
+//         <div class="rounded-xl border border-green-500/20 bg-green-500/5 p-4 hover:border-green-400 transition">
+
+//           <div class="flex items-start justify-between">
+
+//             <div>
+//               <h3 class="text-lg font-bold text-white">
+//                 ${stock.symbol}
+//               </h3>
+
+//               <p class="text-xs text-gray-500 uppercase mt-1">
+//                 ${stock.sector}
+//               </p>
+//             </div>
+
+//             <div class="text-right">
+//               <p class="text-green-400 font-bold">
+//                 ${confidence}% Confidence
+//               </p>
+
+//               <p class="text-green-400 text-sm font-semibold">
+//                 STRONG BUY
+//               </p>
+//             </div>
+
+//           </div>
+
+//           <div class="grid grid-cols-3 gap-3 mt-4 text-sm">
+
+//             <div>
+//               <p class="text-gray-500">Price</p>
+//               <p class="text-white font-semibold">
+//                 PKR ${stock.price}
+//               </p>
+//             </div>
+
+//             <div>
+//               <p class="text-gray-500">Volume</p>
+//               <p class="text-gray-300 font-semibold">
+//                 ${parseInt(stock.volume).toLocaleString()}
+//               </p>
+//             </div>
+
+//             <div>
+//               <p class="text-gray-500">Trend</p>
+//               <p class="text-cyan-400 font-semibold">
+//                 Stable
+//               </p>
+//             </div>
+
+//           </div>
+
+//         </div>
+//       `;
+//     }).join('');
+// }
+loadStocks();
+ loadAILongTerm();
+setInterval(() => {
   loadStocks();
-  setInterval(loadStocks, 300000); // Refresh every 5 mins
+  loadAIPredictions();
+}, 300000);
   // ── KSE-100 Candlestick Chart ────────────────────────────────────────────────
 let kseChart = null;
 

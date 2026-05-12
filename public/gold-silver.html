@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Gold & Silver Prices Pakistan</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-950 text-white min-h-screen p-4">
+<div class="max-w-4xl mx-auto">
+
+  <!-- Nav -->
+  <div class="flex flex-wrap justify-between items-center mb-6 gap-3">
+    <h1 class="text-2xl font-bold text-yellow-400">🥇 Gold & Silver — Pakistan</h1>
+    <div class="flex flex-wrap gap-2">
+      <a href="/"                        class="nav-btn">📈 Dashboard</a>
+      <a href="/sector-performance.html" class="nav-btn">📊 Sectors</a>
+      <a href="/ai-predictions.html"     class="nav-btn">🤖 AI Signals</a>
+      <a href="/gold-silver.html"        class="nav-btn active">🥇 Gold & Silver</a>
+    </div>
+  </div>
+
+  <style>
+    .nav-btn { border:1px solid #374151; background:#111827; color:#d1d5db;
+      padding:5px 12px; border-radius:8px; font-size:12px; text-decoration:none; }
+    .nav-btn:hover { background:#1f2937; color:#fff; }
+    .nav-btn.active { border-color:#b45309; background:rgba(180,83,9,0.25); color:#fcd34d; }
+  </style>
+
+  <!-- Status -->
+  <div class="flex justify-between items-center mb-5 flex-wrap gap-2">
+    <div>
+      <p id="status" class="text-gray-400 text-sm">⏳ Loading prices from gold.pk...</p>
+      <p id="timestamp" class="text-gray-600 text-xs mt-0.5"></p>
+    </div>
+    <button id="refresh-btn"
+      class="border border-yellow-700 bg-yellow-900/30 rounded-lg px-3 py-1.5 text-xs text-yellow-300 hover:bg-yellow-800/40">
+      🔄 Refresh
+    </button>
+  </div>
+
+  <!-- Error box -->
+  <div id="error-box" class="hidden mb-4 rounded-xl border border-red-700 bg-red-900/20 p-4 text-red-300 text-sm"></div>
+
+  <!-- Loading skeleton -->
+  <div id="loading" class="space-y-4">
+    <div class="h-24 rounded-xl bg-gray-800 animate-pulse"></div>
+    <div class="h-40 rounded-xl bg-gray-800 animate-pulse"></div>
+    <div class="h-32 rounded-xl bg-gray-800 animate-pulse"></div>
+  </div>
+
+  <!-- Main content (hidden until loaded) -->
+  <div id="content" class="hidden space-y-6">
+
+    <!-- Gold main prices -->
+    <div>
+      <h2 class="text-yellow-400 font-bold text-lg mb-3">🥇 Gold Today</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div class="rounded-xl bg-yellow-900/20 border border-yellow-700/40 p-4 text-center">
+          <p class="text-gray-400 text-xs mb-1">Per Tola • 24K</p>
+          <p id="gold-tola" class="text-3xl font-bold text-yellow-300">--</p>
+          <p class="text-gray-500 text-xs mt-1">1 Tola = 11.664g</p>
+        </div>
+        <div class="rounded-xl bg-yellow-900/20 border border-yellow-700/40 p-4 text-center">
+          <p class="text-gray-400 text-xs mb-1">Per 10 Gram • 24K</p>
+          <p id="gold-10g" class="text-3xl font-bold text-yellow-300">--</p>
+          <p class="text-gray-500 text-xs mt-1">International standard</p>
+        </div>
+        <div class="rounded-xl bg-yellow-900/20 border border-yellow-700/40 p-4 text-center">
+          <p class="text-gray-400 text-xs mb-1">Per Gram • 24K</p>
+          <p id="gold-gram" class="text-3xl font-bold text-yellow-300">--</p>
+          <p class="text-gray-500 text-xs mt-1">Calculated from tola</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- By Karat -->
+    <div>
+      <h2 class="text-yellow-400 font-bold text-base mb-3">By Karat</h2>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3" id="karat-cards"></div>
+    </div>
+
+    <!-- City prices -->
+    <div>
+      <h2 class="text-yellow-400 font-bold text-base mb-3">🏙️ City-wise Rates (24K/Tola)</h2>
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2" id="city-cards"></div>
+    </div>
+
+    <!-- Divider -->
+    <hr class="border-gray-800"/>
+
+    <!-- Silver -->
+    <div>
+      <h2 class="text-gray-300 font-bold text-lg mb-3">🥈 Silver Today</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div class="rounded-xl bg-gray-800/50 border border-gray-700 p-4 text-center">
+          <p class="text-gray-400 text-xs mb-1">Per Tola</p>
+          <p id="silver-tola" class="text-3xl font-bold text-gray-200">--</p>
+          <p class="text-gray-500 text-xs mt-1">1 Tola = 11.664g</p>
+        </div>
+        <div class="rounded-xl bg-gray-800/50 border border-gray-700 p-4 text-center">
+          <p class="text-gray-400 text-xs mb-1">Per Gram</p>
+          <p id="silver-gram" class="text-3xl font-bold text-gray-200">--</p>
+          <p class="text-gray-500 text-xs mt-1">Calculated from tola</p>
+        </div>
+      </div>
+    </div>
+
+    <p class="text-gray-700 text-xs text-center pb-4">
+      Source: gold.pk • Auto-refreshes every 15 minutes • Prices in PKR
+    </p>
+  </div>
+
+</div>
+<script>
+  function getApiBase() {
+    return window.location.protocol === 'file:' ? 'http://localhost:3000' : '';
+  }
+
+  function fmt(n) {
+    return 'PKR ' + Number(n).toLocaleString('en-PK');
+  }
+
+  async function load() {
+    document.getElementById('status').textContent    = '⏳ Fetching from gold.pk...';
+    document.getElementById('error-box').classList.add('hidden');
+    document.getElementById('loading').classList.remove('hidden');
+    document.getElementById('content').classList.add('hidden');
+
+    try {
+      const res  = await fetch(`${getApiBase()}/api/gold-silver`);
+      const json = await res.json();
+
+      if (!json.success) throw new Error(json.error || 'API returned error');
+
+      // Status
+      document.getElementById('status').textContent    =
+        json.stale ? '⚠️ Showing cached data (gold.pk unavailable)'
+        : json.cached ? '📦 Cached — ' + json.timestamp
+        : '✅ Live from gold.pk';
+      document.getElementById('timestamp').textContent = 'Updated: ' + json.timestamp;
+
+      const g = json.gold;
+      const s = json.silver;
+
+      // Gold main
+      document.getElementById('gold-tola').textContent = fmt(g.pkrPerTola);
+      document.getElementById('gold-10g').textContent  = fmt(g.pkrPer10g);
+      document.getElementById('gold-gram').textContent = fmt(g.pkrPerGram);
+
+      // Karats
+      document.getElementById('karat-cards').innerHTML =
+        Object.entries(g.byKarat).map(([k, v]) => `
+          <div class="rounded-xl bg-yellow-900/10 border border-yellow-800/30 p-3 text-center">
+            <p class="text-yellow-400 font-bold text-base">${k}</p>
+            <p class="text-white font-semibold text-sm mt-1">${Number(v.perTola).toLocaleString()}</p>
+            <p class="text-gray-500 text-xs">per tola</p>
+            <p class="text-gray-400 text-xs mt-1">${Number(v.perGram).toLocaleString()}/g</p>
+          </div>`).join('');
+
+      // Cities
+      if (g.cityPrices && g.cityPrices.length) {
+        document.getElementById('city-cards').innerHTML =
+          g.cityPrices.map(c => `
+            <div class="rounded-lg bg-gray-900 border border-gray-800 p-3 text-center">
+              <p class="text-gray-200 font-semibold text-sm">${c.city}</p>
+              <p class="text-yellow-300 text-xs mt-1">${Number(c.bid).toLocaleString()}</p>
+              <p class="text-gray-500 text-xs">Bid</p>
+            </div>`).join('');
+      }
+
+      // Silver
+      document.getElementById('silver-tola').textContent = fmt(s.pkrPerTola);
+      document.getElementById('silver-gram').textContent = fmt(s.pkrPerGram);
+
+      // Show content
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('content').classList.remove('hidden');
+
+    } catch (err) {
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('status').textContent = '❌ Failed to load';
+      document.getElementById('error-box').textContent = '❌ ' + err.message;
+      document.getElementById('error-box').classList.remove('hidden');
+    }
+  }
+
+  document.getElementById('refresh-btn').addEventListener('click', load);
+  load();
+  setInterval(load, 15 * 60 * 1000);
+</script>
+</body>
+</html>

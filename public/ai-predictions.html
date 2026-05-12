@@ -1,0 +1,443 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AI Predictions — PSX Watch</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+
+    /* signal badge */
+    .badge-buy  { background: rgba(34,197,94,0.12);  color: #4ade80; border: 1px solid rgba(34,197,94,0.3);  }
+    .badge-sell { background: rgba(239,68,68,0.12);  color: #f87171; border: 1px solid rgba(239,68,68,0.3);  }
+    .badge-hold { background: rgba(234,179,8,0.12);  color: #facc15; border: 1px solid rgba(234,179,8,0.3);  }
+
+    /* score bar */
+    .score-bar { height: 4px; border-radius: 9999px; background: rgba(255,255,255,0.07); overflow: hidden; }
+    .score-fill-buy  { background: linear-gradient(90deg, #22c55e, #4ade80); }
+    .score-fill-sell { background: linear-gradient(90deg, #ef4444, #f87171); }
+    .score-fill-hold { background: linear-gradient(90deg, #eab308, #facc15); }
+
+    /* card hover */
+    .pred-card { transition: transform 0.15s, box-shadow 0.15s; }
+    .pred-card:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,0.5); }
+
+    /* skeleton shimmer */
+    .skeleton {
+      background: linear-gradient(90deg, #1f2937 25%, #2d3748 50%, #1f2937 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+      border-radius: 4px;
+    }
+    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+    /* confidence ring */
+    .ring-wrap { position: relative; width: 56px; height: 56px; flex-shrink: 0; }
+    .ring-svg { transform: rotate(-90deg); }
+    .ring-bg   { fill: none; stroke: rgba(255,255,255,0.07); stroke-width: 4; }
+    .ring-fg   { fill: none; stroke-width: 4; stroke-linecap: round; transition: stroke-dashoffset 0.6s ease; }
+    .ring-label { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+                  font-size: 0.65rem; font-weight: 700; letter-spacing: -0.02em; }
+  </style>
+</head>
+<body class="bg-gray-950 text-white min-h-screen">
+
+<div class="max-w-7xl mx-auto px-4 py-6">
+
+  <!-- ── HEADER ── -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+    <div class="flex items-center gap-3">
+      <a href="/" class="text-gray-400 hover:text-white text-sm border border-gray-700 rounded-lg px-3 py-1.5 transition">
+        ← Dashboard
+      </a>
+      <div>
+        <h1 class="text-2xl font-bold text-white">🤖 AI Predictions</h1>
+        <p class="text-gray-500 text-xs mt-0.5">3-year signal model · BUY / SELL / HOLD</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 text-xs text-gray-500">
+      <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block"></span>
+      <span id="status-text">Loading data…</span>
+    </div>
+  </div>
+
+  <!-- ── SUMMARY STRIP ── -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+    <div class="bg-gray-900 rounded-xl p-3 border border-gray-800">
+      <p class="text-gray-500 text-xs mb-1">Total Stocks</p>
+      <p id="stat-total" class="text-2xl font-bold text-white">—</p>
+    </div>
+    <div class="bg-green-950/40 rounded-xl p-3 border border-green-900/50">
+      <p class="text-gray-500 text-xs mb-1">BUY Signals</p>
+      <p id="stat-buy" class="text-2xl font-bold text-green-400">—</p>
+    </div>
+    <div class="bg-yellow-950/30 rounded-xl p-3 border border-yellow-900/40">
+      <p class="text-gray-500 text-xs mb-1">HOLD Signals</p>
+      <p id="stat-hold" class="text-2xl font-bold text-yellow-400">—</p>
+    </div>
+    <div class="bg-red-950/30 rounded-xl p-3 border border-red-900/40">
+      <p class="text-gray-500 text-xs mb-1">SELL Signals</p>
+      <p id="stat-sell" class="text-2xl font-bold text-red-400">—</p>
+    </div>
+  </div>
+
+  <!-- ── FILTERS ── -->
+  <div class="flex flex-col sm:flex-row gap-2 mb-6">
+    <input
+      id="search-input"
+      type="text"
+      placeholder="🔍 Search symbol or company…"
+      class="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-violet-500 transition"
+      oninput="applyFilters()"
+    />
+    <select
+      id="industry-filter"
+      class="bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-violet-500 transition min-w-[180px]"
+      onchange="applyFilters()"
+    >
+      <option value="">All Industries</option>
+    </select>
+    <select
+      id="signal-filter"
+      class="bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-violet-500 transition"
+      onchange="applyFilters()"
+    >
+      <option value="">All Signals</option>
+      <option value="BUY">BUY only</option>
+      <option value="HOLD">HOLD only</option>
+      <option value="SELL">SELL only</option>
+    </select>
+    <select
+      id="sort-filter"
+      class="bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-violet-500 transition"
+      onchange="applyFilters()"
+    >
+      <option value="score_desc">Sort: Highest Score</option>
+      <option value="score_asc">Sort: Lowest Score</option>
+      <option value="price_desc">Sort: Price High</option>
+      <option value="price_asc">Sort: Price Low</option>
+      <option value="change_desc">Sort: Best Change</option>
+      <option value="change_asc">Sort: Worst Change</option>
+    </select>
+  </div>
+
+  <!-- ── RESULT COUNT ── -->
+  <p id="result-count" class="text-gray-500 text-xs mb-4"></p>
+
+  <!-- ── CARDS GRID ── -->
+  <div id="cards-container" class="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <!-- cards injected by JS -->
+  </div>
+  <!-- ── EMPTY STATE ── -->
+  <div id="empty-state" class="hidden text-center py-20 text-gray-500">
+    <p class="text-4xl mb-3">🔍</p>
+    <p class="font-semibold">No stocks match your filters</p>
+    <p class="text-sm mt-1">Try adjusting the industry or signal filters</p>
+  </div>
+
+  <!-- ── MODEL INFO ── -->
+  <div class="mt-10 rounded-2xl border border-gray-800 bg-gray-900/50 p-5">
+    <h2 class="text-sm font-semibold text-violet-400 mb-3">📊 How the 3-Year Prediction Model Works</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs text-gray-400 leading-relaxed">
+      <div class="space-y-1">
+        <p class="text-white font-medium">Momentum Score</p>
+        <p>Weights today's price change percentage. Strong positive momentum (&gt;3%) contributes up to 30 pts toward a BUY signal over the long horizon.</p>
+      </div>
+      <div class="space-y-1">
+        <p class="text-white font-medium">Volume Strength</p>
+        <p>High-volume stocks (5M+ shares) suggest institutional interest. Volume above 1M adds 20 pts; above 500K adds 10 pts to the score.</p>
+      </div>
+      <div class="space-y-1">
+        <p class="text-white font-medium">Trend Quality</p>
+        <p>Checks if current price is above open (bullish intraday) and near day-high (proximity ≥98%). Both factors add up to 30 pts combined.</p>
+      </div>
+    </div>
+    <div class="mt-4 pt-4 border-t border-gray-800 text-xs text-gray-600">
+      ⚠ Predictions are algorithmic estimates for informational purposes only. They do not constitute financial advice. Always conduct your own research before investing.
+    </div>
+  </div>
+
+  <p class="text-center text-gray-700 text-xs mt-6 pb-4">PSX Watch · AI Predictions · Data from PSX.com.pk</p>
+</div>
+
+<script>
+  let allPredictions = [];
+  let filteredPredictions = [];
+
+  function getApiBase() {
+    if (window.location.protocol === 'file:') return 'http://localhost:3000';
+    return '';
+  }
+
+  // ── SIGNAL LOGIC (3-year horizon) ────────────────────────────────────────────
+  // We derive a composite score 0–100 and map to BUY / HOLD / SELL
+  function computeSignal(stock) {
+    const change  = parseFloat(stock.changePercent) || 0;
+    const volume  = parseInt(stock.volume)          || 0;
+    const price   = parseFloat(stock.price)         || 0;
+    const open    = parseFloat(stock.open)          || price;
+    const high    = parseFloat(stock.high)          || price;
+    const low     = parseFloat(stock.low)           || price;
+
+    let score = 0;
+
+    // 1. Momentum (max 30 pts)
+    if      (change >  5) score += 30;
+    else if (change >  3) score += 22;
+    else if (change >  1) score += 12;
+    else if (change >  0) score +=  5;
+    else if (change > -1) score -=  5;
+    else if (change > -3) score -= 12;
+    else if (change > -5) score -= 20;
+    else                  score -= 30;
+
+    // 2. Volume strength (max 25 pts)
+    if      (volume > 5000000) score += 25;
+    else if (volume > 1000000) score += 18;
+    else if (volume > 500000)  score += 10;
+    else if (volume > 100000)  score +=  4;
+
+    // 3. Bullish intraday (up to 15 pts)
+    if (price > open) score += 15;
+
+    // 4. Near day high — shows buying pressure (up to 15 pts)
+    if (high > 0 && price >= high * 0.98) score += 15;
+
+    // 5. Low spread quality (up to 10 pts) — tight high/low spread = stability
+    const spreadPct = high > 0 ? ((high - low) / high) * 100 : 999;
+    if (spreadPct < 1)   score += 10;
+    else if (spreadPct < 2) score += 5;
+
+    // 6. Price base quality (up to 5 pts)
+    if (price > 100) score += 5;
+    else if (price > 50) score += 3;
+
+    // Normalise to 0–100
+    score = Math.min(100, Math.max(0, score + 35)); // shift baseline to 35
+
+    // 3-year signals
+    let signal, horizon;
+    if      (score >= 65) { signal = 'BUY';  horizon = '12–36 months'; }
+    else if (score >= 45) { signal = 'HOLD'; horizon = 'Monitor 6–12 months'; }
+    else                  { signal = 'SELL'; horizon = 'Exit / Avoid'; }
+
+    // Confidence label
+    let confidence;
+    if      (score >= 80) confidence = 'Strong';
+    else if (score >= 65) confidence = 'Moderate';
+    else if (score >= 50) confidence = 'Neutral';
+    else if (score >= 35) confidence = 'Cautious';
+    else                  confidence = 'Weak';
+
+    // Target price estimate (rough 3-year projection)
+    const annualReturnEst = signal === 'BUY' ? 0.12 : signal === 'HOLD' ? 0.04 : -0.08;
+    const target3yr = price * Math.pow(1 + annualReturnEst, 3);
+
+    return { score, signal, confidence, horizon, target3yr };
+  }
+
+  // ── BUILD CARD HTML ───────────────────────────────────────────────────────────
+  function buildCard(stock) {
+    const { score, signal, confidence, horizon, target3yr } = computeSignal(stock);
+
+    const change  = parseFloat(stock.changePercent) || 0;
+    const price   = parseFloat(stock.price) || 0;
+    const isUp    = change >= 0;
+
+    const badgeCls   = signal === 'BUY' ? 'badge-buy' : signal === 'SELL' ? 'badge-sell' : 'badge-hold';
+    const fillCls    = signal === 'BUY' ? 'score-fill-buy' : signal === 'SELL' ? 'score-fill-sell' : 'score-fill-hold';
+    const ringColor  = signal === 'BUY' ? '#4ade80' : signal === 'SELL' ? '#f87171' : '#facc15';
+    const ringLblCls = signal === 'BUY' ? 'text-green-400' : signal === 'SELL' ? 'text-red-400' : 'text-yellow-400';
+    const changeCls  = isUp ? 'text-green-400' : 'text-red-400';
+    const arrow      = isUp ? '▲' : '▼';
+
+    const circumference = 2 * Math.PI * 22; // r=22
+    const offset = circumference - (score / 100) * circumference;
+
+    return `
+      <div class="pred-card bg-gray-900 rounded-xl p-4 border border-gray-800 flex flex-col gap-3 cursor-default">
+
+        <!-- top row -->
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0">
+            <p class="font-bold text-white text-sm truncate">${stock.symbol}</p>
+            <p class="text-gray-500 text-xs truncate mt-0.5">${stock.sector}</p>
+          </div>
+          <!-- confidence ring -->
+          <div class="ring-wrap">
+            <svg class="ring-svg" viewBox="0 0 56 56" width="56" height="56">
+              <circle class="ring-bg" cx="28" cy="28" r="22"/>
+              <circle class="ring-fg" cx="28" cy="28" r="22"
+                stroke="${ringColor}"
+                stroke-dasharray="${circumference.toFixed(2)}"
+                stroke-dashoffset="${offset.toFixed(2)}"/>
+            </svg>
+            <div class="ring-label ${ringLblCls}">${Math.round(score)}%</div>
+          </div>
+        </div>
+
+        <!-- price -->
+        <div>
+          <p class="text-xl font-bold text-white">PKR ${price.toLocaleString('en-PK', {minimumFractionDigits:2, maximumFractionDigits:2})}</p>
+          <p class="${changeCls} text-xs font-semibold mt-0.5">${arrow} ${Math.abs(change).toFixed(2)}% today</p>
+        </div>
+
+        <!-- signal badge -->
+        <div class="flex items-center gap-2">
+          <span class="rounded-md px-2.5 py-1 text-xs font-bold tracking-wide ${badgeCls}">${signal}</span>
+          <span class="text-gray-500 text-xs">${confidence}</span>
+        </div>
+
+        <!-- score bar -->
+        <div>
+          <div class="flex justify-between text-xs text-gray-500 mb-1">
+            <span>AI Score</span><span class="font-medium text-gray-300">${Math.round(score)}/100</span>
+          </div>
+          <div class="score-bar">
+            <div class="${fillCls}" style="width:${score}%; height:100%;"></div>
+          </div>
+        </div>
+
+        <!-- horizon + target -->
+        <div class="border-t border-gray-800 pt-2 grid grid-cols-2 gap-2 text-xs text-gray-400">
+          <div>
+            <p class="text-gray-600 uppercase tracking-wide" style="font-size:0.6rem;">Horizon</p>
+            <p class="text-gray-300 mt-0.5">${horizon}</p>
+          </div>
+          <div>
+            <p class="text-gray-600 uppercase tracking-wide" style="font-size:0.6rem;">3-Yr Target</p>
+            <p class="${signal==='BUY'?'text-green-400':signal==='SELL'?'text-red-400':'text-yellow-400'} font-semibold mt-0.5">
+              PKR ${target3yr.toLocaleString('en-PK', {minimumFractionDigits:0, maximumFractionDigits:0})}
+            </p>
+          </div>
+        </div>
+
+        <!-- mini stats -->
+        <div class="grid grid-cols-3 gap-1 text-xs text-gray-500">
+          <div>H: <span class="text-gray-300">${parseFloat(stock.high)||0}</span></div>
+          <div>L: <span class="text-gray-300">${parseFloat(stock.low)||0}</span></div>
+          <div>Vol: <span class="text-gray-300">${parseInt(stock.volume).toLocaleString()}</span></div>
+        </div>
+
+      </div>
+    `;
+  }
+
+  // ── POPULATE INDUSTRY DROPDOWN ────────────────────────────────────────────────
+  function populateIndustries(stocks) {
+    const sectors = [...new Set(stocks.map(s => s.sector).filter(Boolean))].sort();
+    const sel = document.getElementById('industry-filter');
+    sel.innerHTML = '<option value="">All Industries</option>';
+    sectors.forEach(sec => {
+      const opt = document.createElement('option');
+      opt.value = sec;
+      opt.textContent = sec;
+      sel.appendChild(opt);
+    });
+  }
+
+  // ── APPLY FILTERS & RENDER ────────────────────────────────────────────────────
+  function applyFilters() {
+    const q        = document.getElementById('search-input').value.toLowerCase().trim();
+    const industry = document.getElementById('industry-filter').value;
+    const sigFilt  = document.getElementById('signal-filter').value;
+    const sortVal  = document.getElementById('sort-filter').value;
+
+    let filtered = allPredictions.filter(stock => {
+      const { signal } = computeSignal(stock);
+      const matchQ   = !q || stock.symbol.toLowerCase().includes(q) || (stock.sector||'').toLowerCase().includes(q);
+      const matchInd = !industry || stock.sector === industry;
+      const matchSig = !sigFilt  || signal === sigFilt;
+      return matchQ && matchInd && matchSig;
+    });
+
+    // sort
+    filtered.sort((a, b) => {
+      const sa = computeSignal(a), sb = computeSignal(b);
+      if (sortVal === 'score_desc')  return sb.score - sa.score;
+      if (sortVal === 'score_asc')   return sa.score - sb.score;
+      if (sortVal === 'price_desc')  return (parseFloat(b.price)||0) - (parseFloat(a.price)||0);
+      if (sortVal === 'price_asc')   return (parseFloat(a.price)||0) - (parseFloat(b.price)||0);
+      if (sortVal === 'change_desc') return (parseFloat(b.changePercent)||0) - (parseFloat(a.changePercent)||0);
+      if (sortVal === 'change_asc')  return (parseFloat(a.changePercent)||0) - (parseFloat(b.changePercent)||0);
+      return sb.score - sa.score;
+    });
+
+    filteredPredictions = filtered;
+    renderCards(filtered);
+  }
+
+  function renderCards(stocks) {
+    const container = document.getElementById('cards-container');
+    const empty     = document.getElementById('empty-state');
+
+    if (!stocks.length) {
+      container.innerHTML = '';
+      empty.classList.remove('hidden');
+      document.getElementById('result-count').textContent = 'No results';
+      return;
+    }
+    empty.classList.add('hidden');
+    document.getElementById('result-count').textContent =
+      `Showing ${stocks.length} of ${allPredictions.length} stocks`;
+    container.innerHTML = stocks.map(buildCard).join('');
+  }
+
+  // ── STATS STRIP ──────────────────────────────────────────────────────────────
+  function updateStats(stocks) {
+    let buy = 0, hold = 0, sell = 0;
+    stocks.forEach(s => {
+      const { signal } = computeSignal(s);
+      if (signal === 'BUY')  buy++;
+      else if (signal === 'HOLD') hold++;
+      else sell++;
+    });
+    document.getElementById('stat-total').textContent = stocks.length;
+    document.getElementById('stat-buy').textContent   = buy;
+    document.getElementById('stat-hold').textContent  = hold;
+    document.getElementById('stat-sell').textContent  = sell;
+  }
+
+  // ── LOAD DATA ────────────────────────────────────────────────────────────────
+  async function loadPredictions() {
+    try {
+      const res  = await fetch(`${getApiBase()}/api/stocks`);
+      const json = await res.json();
+
+      if (!json.success || !Array.isArray(json.data)) throw new Error(json.error || 'Bad response');
+
+      allPredictions = json.data;
+
+      populateIndustries(allPredictions);
+      updateStats(allPredictions);
+      applyFilters();
+
+      document.getElementById('status-text').textContent =
+        `${allPredictions.length} stocks · Updated ${json.updated}`;
+
+    } catch (err) {
+      console.error('Predictions load error:', err);
+      document.getElementById('status-text').textContent = '⚠ Failed to load data';
+      document.getElementById('cards-container').innerHTML = `
+        <div class="col-span-full text-center py-16 text-red-400">
+          <p class="text-3xl mb-3">⚠</p>
+          <p class="font-semibold">Could not connect to the PSX data server</p>
+          <p class="text-sm text-gray-500 mt-1">${err.message}</p>
+          <button onclick="loadPredictions()" class="mt-4 bg-gray-800 border border-gray-700 text-gray-300 px-4 py-2 rounded-lg text-sm hover:bg-gray-700 transition">
+            Retry
+          </button>
+        </div>`;
+    }
+  }
+
+  loadPredictions();
+  setInterval(loadPredictions, 300000);
+</script>
+</body>
+</html>
