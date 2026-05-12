@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mutual Funds</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+ <div class="flex flex-wrap justify-between items-center mb-6 gap-3">
+
+  
+</div>
+
+</head>
+
+<body class="bg-gray-950 text-white min-h-screen p-4">
+
+<div class="max-w-6xl mx-auto">
+
+  <!-- Header -->
+  <div class="flex justify-between items-center mb-4">
+    <h1 class="text-2xl font-bold text-emerald-400">
+      💰 Mutual Funds Dashboard
+    </h1>
+<div class="flex flex-wrap gap-2">
+
+    <a href="/" class="nav-btn">📈 Dashboard</a>
+    <a href="/sector-performance.html" class="nav-btn">📊 Sectors</a>
+    <a href="/ai-predictions.html" class="nav-btn">🤖 AI Signals</a>
+    <a href="/gold-silver.html" class="nav-btn">🥇 Gold & Silver</a>
+    <a href="#" class="nav-btn active">💰 Mutual Funds</a>
+
+  </div>
+ <style>
+    .nav-btn { border:1px solid #374151; background:#111827; color:#d1d5db;
+      padding:5px 12px; border-radius:8px; font-size:12px; text-decoration:none; }
+    .nav-btn:hover { background:#1f2937; color:#fff; }
+    .nav-btn.active { border-color:#b45309; background:rgba(180,83,9,0.25); color:#fcd34d; }
+
+  .risk-high {
+  color: #f87171;
+  border-color: #dc2626;
+  background: rgba(220, 38, 38, 0.15);
+}
+
+.risk-medium {
+  color: #facc15;
+  border-color: #eab308;
+  background: rgba(234, 179, 8, 0.15);
+}
+
+.risk-low {
+  color: #4ade80;
+  border-color: #16a34a;
+  background: rgba(22, 163, 74, 0.15);
+}
+
+.risk-default {
+  color: #d1d5db;
+  border-color: #6b7280;
+  background: rgba(75, 85, 99, 0.15);
+}
+  </style>
+
+    <button onclick="loadMutualFunds()" 
+      class="bg-emerald-600 px-4 py-2 rounded-lg text-sm">
+      Refresh
+    </button>
+  </div>
+
+  <!-- Filter -->
+  <div class="mb-4 flex gap-2 flex-wrap">
+
+    <select id="amcFilter"
+      class="bg-gray-800 px-3 py-2 rounded-lg text-sm border border-gray-700"
+      onchange="loadMutualFunds()">
+      <option value="">All AMCs</option>
+    </select>
+
+  </div>
+
+  <!-- Container -->
+  <div id="mutualFundsContainer" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"></div>
+
+</div>
+
+<script src="/mutual-funds.js"></script>
+
+</body>
+</html>

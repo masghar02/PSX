@@ -36,6 +36,10 @@
         class="flex-shrink-0 rounded-lg border border-violet-700 bg-violet-900/30 px-3 py-1.5 text-xs text-violet-200 hover:bg-violet-800/40 transition whitespace-nowrap">
         🤖 AI Predictions
       </a>
+      <a href="/mutual-funds.html"
+  class="flex-shrink-0 rounded-lg border border-emerald-700 bg-emerald-900/30 px-3 py-1.5 text-xs text-emerald-200 hover:bg-emerald-800/40 transition whitespace-nowrap">
+  💰 Mutual Funds
+</a>
     </div>
   </div>
   <style>
@@ -226,7 +230,36 @@
     Data scraped from PSX.com.pk • Auto-refreshes every 5 minutes
   </p>
 </div>
+<!-- HBL Mutual Funds
+<div id="mutual-funds"
+  class="mb-6 rounded-2xl border border-emerald-700/40 bg-gray-900 p-4">
 
+  <div class="flex items-center justify-between mb-4">
+    <div>
+      <h2 class="text-xl font-bold text-emerald-400">
+        💰 HBL Mutual Funds
+      </h2>
+
+      <p class="text-xs text-gray-500">
+        Live HBL AMC mutual funds from MUFAP
+      </p>
+    </div>
+
+    <button onclick="loadMutualFunds()"
+      class="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold hover:bg-emerald-500 transition">
+      Refresh
+    </button>
+  </div>
+
+  <div id="mutualFundsContainer"
+    class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+
+    <div class="text-gray-500 text-sm">
+      Loading mutual funds...
+    </div>
+
+  </div>
+</div> -->
 <script>
   let allStocks = [];
   let refreshTimer = 300;
@@ -906,177 +939,134 @@ async function loadAIPredictions() {
 
   renderWatchlistChips();
   renderAlerts();
-//   function renderAIPredictions(stocks) {
+ async function loadMutualFunds() {
 
-//   // SHORT TERM LOGIC
-//   // High momentum + high volume
+  const container =
+    document.getElementById('mutualFundsContainer');
 
-//   const shortTerm = [...stocks]
-//     .filter(s =>
-//       parseFloat(s.volume) > 100000 &&
-//       parseFloat(s.changePercent) > 2
-//     )
-//     .sort((a, b) =>
-//       parseFloat(b.changePercent) - parseFloat(a.changePercent)
-//     )
-//     .slice(0, 5);
+  try {
 
-//   // LONG TERM LOGIC
-//   // Stable price + strong volume + not overextended
+    container.innerHTML = `
+      <div class="text-gray-500 text-sm">
+        Loading mutual funds...
+      </div>
+    `;
 
-//   const longTerm = [...stocks]
-//     .filter(s =>
-//       parseFloat(s.price) > 20 &&
-//       parseFloat(s.volume) > 500000 &&
-//       Math.abs(parseFloat(s.changePercent)) < 6
-//     )
-//     .sort((a, b) =>
-//       parseFloat(b.volume) - parseFloat(a.volume)
-//     )
-//     .slice(0, 5);
+    const res =
+      await fetch('/api/hbl-funds');
 
-//   // Render Short-Term
-//   document.getElementById('ai-short-term').innerHTML =
-//     shortTerm.map(stock => {
+    const json =
+      await res.json();
 
-//       const confidence =
-//         Math.min(
-//           95,
-//           Math.round(
-//             parseFloat(stock.changePercent) * 8 +
-//             Math.log10(stock.volume) * 10
-//           )
-//         );
+    if (!json.success) {
+      throw new Error(json.error || 'Failed');
+    }
 
-//       return `
-//         <div class="rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-4 hover:border-cyan-400 transition">
+    if (!json.funds.length) {
 
-//           <div class="flex items-start justify-between">
+      container.innerHTML = `
+        <div class="text-gray-500 text-sm">
+          No funds available
+        </div>
+      `;
 
-//             <div>
-//               <h3 class="text-lg font-bold text-white">
-//                 ${stock.symbol}
-//               </h3>
+      return;
+    }
 
-//               <p class="text-xs text-gray-500 uppercase mt-1">
-//                 ${stock.sector}
-//               </p>
-//             </div>
+    container.innerHTML =
+      json.funds.map(fund => {
 
-//             <div class="text-right">
-//               <p class="text-cyan-400 font-bold">
-//                 ${confidence}% Confidence
-//               </p>
+        const risk =
+          (fund.risk || '').toLowerCase();
 
-//               <p class="text-green-400 text-sm font-semibold">
-//                 BUY
-//               </p>
-//             </div>
+        let riskColor =
+          'text-yellow-400 bg-yellow-900/30 border-yellow-700';
 
-//           </div>
+        if (risk.includes('low')) {
+          riskColor =
+            'text-green-400 bg-green-900/30 border-green-700';
+        }
 
-//           <div class="grid grid-cols-3 gap-3 mt-4 text-sm">
+        if (risk.includes('high')) {
+          riskColor =
+            'text-red-400 bg-red-900/30 border-red-700';
+        }
 
-//             <div>
-//               <p class="text-gray-500">Price</p>
-//               <p class="text-white font-semibold">
-//                 PKR ${stock.price}
-//               </p>
-//             </div>
+        return `
+          <div class="rounded-xl border border-gray-700 bg-gray-950 p-4 hover:border-emerald-500 transition">
 
-//             <div>
-//               <p class="text-gray-500">Change</p>
-//               <p class="text-green-400 font-semibold">
-//                 +${stock.changePercent}%
-//               </p>
-//             </div>
+            <div class="flex justify-between items-start gap-2 mb-3">
 
-//             <div>
-//               <p class="text-gray-500">Volume</p>
-//               <p class="text-gray-300 font-semibold">
-//                 ${parseInt(stock.volume).toLocaleString()}
-//               </p>
-//             </div>
+              <div>
+                <h3 class="font-bold text-white leading-tight">
+                  ${fund.name}
+                </h3>
 
-//           </div>
+                <p class="text-xs text-gray-500 mt-1">
+                  ${fund.category || 'N/A'}
+                </p>
+              </div>
 
-//         </div>
-//       `;
-//     }).join('');
+              <div class="text-right">
 
-//   // Render Long-Term
-//   document.getElementById('ai-long-term').innerHTML =
-//     longTerm.map(stock => {
+                <div class="text-emerald-400 font-bold text-lg">
+                  ${fund.nav || '--'}
+                </div>
 
-//       const confidence =
-//         Math.min(
-//           98,
-//           Math.round(
-//             Math.log10(stock.volume) * 12 +
-//             (100 - Math.abs(stock.changePercent * 5))
-//           )
-//         );
+                <div class="text-xs text-gray-500">
+                  NAV
+                </div>
 
-//       return `
-//         <div class="rounded-xl border border-green-500/20 bg-green-500/5 p-4 hover:border-green-400 transition">
+              </div>
 
-//           <div class="flex items-start justify-between">
+            </div>
 
-//             <div>
-//               <h3 class="text-lg font-bold text-white">
-//                 ${stock.symbol}
-//               </h3>
+            <div class="grid grid-cols-2 gap-3 text-sm mb-3">
 
-//               <p class="text-xs text-gray-500 uppercase mt-1">
-//                 ${stock.sector}
-//               </p>
-//             </div>
+              <div>
+                <p class="text-gray-500 text-xs">
+                  Offer Price
+                </p>
 
-//             <div class="text-right">
-//               <p class="text-green-400 font-bold">
-//                 ${confidence}% Confidence
-//               </p>
+                <p class="font-semibold text-white">
+                  ${fund.offer || '--'}
+                </p>
+              </div>
 
-//               <p class="text-green-400 text-sm font-semibold">
-//                 STRONG BUY
-//               </p>
-//             </div>
+              <div>
+                <p class="text-gray-500 text-xs">
+                  Risk Level
+                </p>
 
-//           </div>
+                <div class="inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${riskColor}">
+                  ${fund.risk || 'N/A'}
+                </div>
+              </div>
 
-//           <div class="grid grid-cols-3 gap-3 mt-4 text-sm">
+            </div>
 
-//             <div>
-//               <p class="text-gray-500">Price</p>
-//               <p class="text-white font-semibold">
-//                 PKR ${stock.price}
-//               </p>
-//             </div>
+          </div>
+        `;
 
-//             <div>
-//               <p class="text-gray-500">Volume</p>
-//               <p class="text-gray-300 font-semibold">
-//                 ${parseInt(stock.volume).toLocaleString()}
-//               </p>
-//             </div>
+      }).join('');
 
-//             <div>
-//               <p class="text-gray-500">Trend</p>
-//               <p class="text-cyan-400 font-semibold">
-//                 Stable
-//               </p>
-//             </div>
+  } catch (err) {
 
-//           </div>
+    console.error(err);
 
-//         </div>
-//       `;
-//     }).join('');
-// }
+    container.innerHTML = `
+      <div class="text-red-400 text-sm">
+        Failed to load mutual funds
+      </div>
+    `;
+  }
+}
 loadStocks();
  loadAILongTerm();
+//  loadMutualFunds();
 setInterval(() => {
   loadStocks();
+  // loadMutualFunds();
   loadAIPredictions();
 }, 300000);
   // ── KSE-100 Candlestick Chart ────────────────────────────────────────────────

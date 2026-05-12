@@ -618,4 +618,74 @@ app.get('/api/gold-silver', async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+app.get('/api/hbl-funds', async (req, res) => {
+  try {
+
+    const response = await axios.get(
+      'https://www.mufap.com.pk/Home/FundByAMC?Id=31',
+      {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+        }
+      }
+    );
+
+    const $ = cheerio.load(response.data);
+
+    const funds = [];
+
+    $('.fund-item, .card, .col-md-4').each((i, el) => {
+
+      const text =
+        $(el).text().replace(/\s+/g, ' ').trim();
+
+      if (!text.includes('NAV')) return;
+
+      const name =
+        $(el).find('h3,h4,h5').first().text().trim()
+        || text.split('NAV')[0].trim();
+
+      // NAV
+      const navMatch =
+        text.match(/([\d,.]+)\s*NAV/i);
+
+      // Offer Price
+      const offerMatch =
+        text.match(/([\d,.]+)\s*Offer Price/i);
+
+      // Category
+      const categoryMatch =
+        text.match(/Offer Price\s*(.*?)\s*Category/i);
+
+      // Risk
+      const riskMatch =
+        text.match(/(Low|Medium|High|Low to High|NA)\s*Risk/i);
+
+      funds.push({
+        name,
+        nav: navMatch ? navMatch[1] : '--',
+        offer: offerMatch ? offerMatch[1] : '--',
+        category: categoryMatch ? categoryMatch[1] : 'N/A',
+        risk: riskMatch ? riskMatch[1] : 'N/A'
+      });
+
+    });
+
+    res.json({
+      success: true,
+      funds
+    });
+
+  } catch (err) {
+
+    console.error(err);
+
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
+
+  }
+});
 module.exports = app; // ← must be at the END
